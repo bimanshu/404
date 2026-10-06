@@ -143,8 +143,13 @@ function siteCore(svg, opts) {
    * given, is the crease ring a little inside the top.
    */
   function boxFaces(ring, z0, z1, inner) {
-    const band = run(ring, front), split = band.findIndex(facesRight);
-    const left = split < 0 ? band : band.slice(0, split + 1), right = split < 0 ? [] : band.slice(Math.max(0, split - 1));
+    // the band turns one way round the ring, so its left-facing and right-facing samples are two runs, in either order;
+    // the sample where they meet goes in both, so the two faces close without a seam
+    const band = run(ring, front), r0 = band.length && facesRight(band[0]);
+    let cut = band.findIndex((q) => facesRight(q) !== r0);
+    if (cut < 0) cut = band.length;
+    const first = band.slice(0, Math.min(band.length, cut + 1)), second = band.slice(Math.max(0, cut - 1));
+    const left = r0 ? (cut < band.length ? second : []) : first, right = r0 ? first : (cut < band.length ? second : []);
     const side = (r) => (r.length < 2 ? "" : poly(ringAt(P, r, z1).concat(ringAt(P, r, z0).reverse())));
     return {
       sil: poly(hull(ringAt(P, ring, z0).concat(ringAt(P, ring, z1)))),

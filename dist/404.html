@@ -17,8 +17,10 @@
     --line-lo: oklch(0.9 0.005 260);      /* what recedes */
     --block-face: oklch(0.87 0.006 260);  /* the blocks' sides */
     --block-top: oklch(0.94 0.004 260);   /* the blocks' tops, lit from above */
+    --block-shade: oklch(0.8 0.007 260);  /* the blocks' sides that face away from the light */
     --loose-face: oklch(0.78 0.008 260);  /* a block a press would knock out */
     --loose-top: oklch(0.86 0.006 260);
+    --loose-shade: oklch(0.72 0.009 260);
     /* surface tones for shading, from in shade (1) to lit (6); the scene picks them by a face's normal */
     --tone-1: oklch(0.76 0.008 260); --tone-2: oklch(0.82 0.007 260); --tone-3: oklch(0.87 0.006 260);
     --tone-4: oklch(0.91 0.005 260); --tone-5: oklch(0.945 0.004 260); --tone-6: oklch(0.975 0.003 255);
@@ -30,8 +32,8 @@
       color-scheme: dark;
       --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
       --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
-      --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260);
-      --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260);
+      --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260); --block-shade: oklch(0.255 0.007 260);
+      --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
       --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
       --tone-4: oklch(0.27 0.007 260); --tone-5: oklch(0.32 0.008 260); --tone-6: oklch(0.38 0.009 260);
       --hivis: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
@@ -41,8 +43,8 @@
     color-scheme: dark;
     --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
     --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
-    --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260);
-    --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260);
+    --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260); --block-shade: oklch(0.255 0.007 260);
+    --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
     --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
     --tone-4: oklch(0.27 0.007 260); --tone-5: oklch(0.32 0.008 260); --tone-6: oklch(0.38 0.009 260);
     --hivis: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
@@ -75,6 +77,8 @@
   .stage .blk-top { fill: var(--block-top); }
   .stage .loose .blk { fill: var(--loose-face); }
   .stage .loose .blk-top { fill: var(--loose-top); }
+  .stage .blk-shade { fill: var(--block-shade); }
+  .stage .loose .blk-shade { fill: var(--loose-shade); }
   .stage .t1 { fill: var(--tone-1); } .stage .t2 { fill: var(--tone-2); } .stage .t3 { fill: var(--tone-3); }
   .stage .t4 { fill: var(--tone-4); } .stage .t5 { fill: var(--tone-5); } .stage .t6 { fill: var(--tone-6); }
   .stage .hv { fill: var(--hivis); }
@@ -812,8 +816,13 @@ function siteCore(svg, opts) {
    * given, is the crease ring a little inside the top.
    */
   function boxFaces(ring, z0, z1, inner) {
-    const band = run(ring, front), split = band.findIndex(facesRight);
-    const left = split < 0 ? band : band.slice(0, split + 1), right = split < 0 ? [] : band.slice(Math.max(0, split - 1));
+    // the band turns one way round the ring, so its left-facing and right-facing samples are two runs, in either order;
+    // the sample where they meet goes in both, so the two faces close without a seam
+    const band = run(ring, front), r0 = band.length && facesRight(band[0]);
+    let cut = band.findIndex((q) => facesRight(q) !== r0);
+    if (cut < 0) cut = band.length;
+    const first = band.slice(0, Math.min(band.length, cut + 1)), second = band.slice(Math.max(0, cut - 1));
+    const left = r0 ? (cut < band.length ? second : []) : first, right = r0 ? first : (cut < band.length ? second : []);
     const side = (r) => (r.length < 2 ? "" : poly(ringAt(P, r, z1).concat(ringAt(P, r, z0).reverse())));
     return {
       sil: poly(hull(ringAt(P, ring, z0).concat(ringAt(P, ring, z1)))),

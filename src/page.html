@@ -79,12 +79,39 @@
   .stage .hv { fill: var(--hivis); }
   .stage .shade-stop { stop-color: var(--shadow); }
 
+  /* the one control: sound, in the top corner, clear of the site */
+  .sound {
+    position: fixed; z-index: 2;
+    inset-block-start: calc(env(safe-area-inset-top, 0px) + 16px);
+    inset-inline-end: calc(env(safe-area-inset-right, 0px) + 16px);
+    inline-size: 44px; block-size: 44px; padding: 0;
+    display: grid; place-items: center;
+    border: 1px solid var(--line-lo); border-radius: 999px;
+    background: var(--bg); color: var(--line-edge); cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
+    transition: color 160ms ease, border-color 160ms ease;
+  }
+  .sound:hover { color: var(--ink); border-color: var(--line-mid); }
+  .sound:focus-visible { outline: 2px solid var(--ink); outline-offset: 3px; }
+  .sound[aria-pressed="true"] { color: var(--ink); border-color: var(--line-mid); }
+  .sound svg { inline-size: 20px; block-size: 20px; }
+  .sound .when-on, .sound[aria-pressed="true"] .when-off { display: none; }
+  .sound[aria-pressed="true"] .when-on { display: inline; }
+  @media (prefers-reduced-motion: reduce) { .sound { transition: none; } }
+
   .sr-only {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
 </style>
 <!-- body -->
+<button class="sound" id="sound" type="button" aria-pressed="false" aria-label="Sound">
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+    <path d="M4 9.5h3.2L12 5.5v13l-4.8-4H4z"/>
+    <path class="when-on" d="M15.6 9.2a4 4 0 0 1 0 5.6M18.2 6.6a7.6 7.6 0 0 1 0 10.8"/>
+    <path class="when-off" d="M16 9.5l5 5M21 9.5l-5 5"/>
+  </svg>
+</button>
 <main>
   <div class="stage" id="stage" data-hairline="construction-404" role="img" tabindex="0"
        aria-label="Page not found. A broken 404 built of blocks, with two tower cranes putting the missing blocks back. Click or tap a block to knock it out, or use the arrow keys to pick one and press Enter."></div>
@@ -94,6 +121,7 @@
 
 <script id="hl-kernel">/*KERNEL*/</script>
 <script id="construction-404">/*SCENE*/</script>
+<script id="site-sound">/*SOUND*/</script>
 <script>
   (() => {
     const $ = (id) => document.getElementById(id);
@@ -101,7 +129,21 @@
     if (["light", "dark"].includes(params.get("theme"))) document.documentElement.dataset.theme = params.get("theme");
 
     HL.inject(document);
-    const stage = $("stage"), live = $("live");
+    const stage = $("stage"), live = $("live"), toggle = $("sound");
+
+    // Sound starts off. A reader who left it on last time hears it from their first press anywhere.
+    const sound = siteSound({ ambience: "audio/ambience.mp3", impact: "audio/impact.mp3" });
+    const show = (on) => toggle.setAttribute("aria-pressed", String(on));
+    toggle.addEventListener("click", () => { sound.setOn(!sound.on); show(sound.on); });
+    if (sound.wanted) {
+      show(true);
+      const wake = (e) => {
+        removeEventListener("pointerdown", wake, true); removeEventListener("keydown", wake, true);
+        if (e.target.closest && e.target.closest("#sound")) return; // the toggle handles its own press
+        if (!sound.on && toggle.getAttribute("aria-pressed") === "true") sound.setOn(true);
+      };
+      addEventListener("pointerdown", wake, true); addEventListener("keydown", wake, true);
+    }
     const svg = HL.mk("svg", { "aria-hidden": "true" }, stage);
 
     // A tall screen gets the 404 and its cranes up close; a wide one gets the whole site.
@@ -115,6 +157,7 @@
         t: Number(params.get("t")) || 0,
         freeze: params.has("freeze"),
         onAnnounce: (text) => { live.textContent = text; },
+        onSound: (e) => sound.play(e),
       });
       stage.dataset.frame = frame;
       stage.style.setProperty("--aspect", site.aspect.toFixed(4));

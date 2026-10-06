@@ -3,7 +3,8 @@
  * Builds the 404 page: `node scripts/build.mjs` writes dist/404.html, one
  * self-contained file with the Hairline kernel and the scene's parts
  * (src/scene) inlined. `--out <file>` writes it elsewhere; `--fragment <file>`
- * also writes the page without its document skeleton.
+ * also writes the page without its document skeleton. The sound files are
+ * not built: they live in dist/audio, next to the page that loads them.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -18,7 +19,8 @@ const PARTS = ["core", "ground", "blocks", "cranes", "people", "main"];
 const scene = PARTS.map((p) => read(`src/scene/${p}.js`)).join("\n\n");
 const page = read("src/page.html")
   .replace("/*KERNEL*/", () => `\n${read("vendor/hairline-kernel.js")}\n`)
-  .replace("/*SCENE*/", () => `\n${scene}\n`);
+  .replace("/*SCENE*/", () => `\n${scene}\n`)
+  .replace("/*SOUND*/", () => `\n${read("src/sound.js")}\n`);
 const [head, body] = page.split("<!-- body -->");
 
 // --out <file> writes the page somewhere else (each worker its own copy); dist/404.html by default.

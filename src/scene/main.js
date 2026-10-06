@@ -24,13 +24,14 @@
  *   opts.onRead     a short status: "fixing 3/8", "fixed", "breaking"
  *   opts.onAnnounce a sentence for a live region, after something the reader did
  *   opts.onKnock    the number of blocks the reader has knocked out
+ *   opts.onSound    { kind: "impact" | "set", strength 0..1, pan -1..1 } when a block hits the ground or is set down
  *   aspect      the viewBox's width over its height, for sizing the stage
  */
 function construction404(stage, svg, opts = {}) {
-  const { register, disposer, reducedMotion, rad, TAU } = { ...HL, TAU: Math.PI * 2 };
+  const { register, disposer, reducedMotion, rad, clamp, TAU } = { ...HL, TAU: Math.PI * 2 };
   const bag = disposer();
   const noop = () => {};
-  const onRead = opts.onRead || noop, onAnnounce = opts.onAnnounce || noop, onKnock = opts.onKnock || noop;
+  const onRead = opts.onRead || noop, onAnnounce = opts.onAnnounce || noop, onKnock = opts.onKnock || noop, onSound = opts.onSound || noop;
 
   const ctx = siteCore(svg, opts);
   const { VW, VH, SZ, S, slots, slotAt, broken, items, layer, story, still } = ctx;
@@ -83,13 +84,32 @@ function construction404(stage, svg, opts = {}) {
     }
   }
 
+  // ---- what the site sounds like: a block meeting the ground, read from the blocks' own motion
+  let audible = false;
+  const pan = (b) => clamp((ctx.P(b.x, b.y, 0)[0] / VW) * 2 - 1, -1, 1) * 0.8;
+  function listen(before, dt) {
+    if (!audible) return;
+    for (const b of blocks) {
+      const was = before.get(b);
+      if (b.state === "falling") {
+        // a falling block's first touch of the ground, and any bounce after it, by how fast it came down
+        const pz = b.__pz ?? b.z, vz = (pz - b.z) / dt;
+        if (b.z <= 0.6 && pz > 0.6 && vz > 2) onSound({ kind: "impact", strength: clamp(vz / 70, 0.15, 1), pan: pan(b) });
+        b.__pz = b.z;
+      } else b.__pz = undefined;
+      if (was === "carried" && b.state !== "carried") onSound({ kind: "set", strength: 0.3, pan: pan(b) });
+    }
+  }
+
   function sim(dt) {
+    const before = audible ? new Map(blocks.map((b) => [b, b.state])) : null;
     story.clock += dt;
     director(dt);
     CR.update(dt);
     B.update(dt);
     PE.update(dt);
     G.update(dt);
+    listen(before, dt);
   }
 
   let read = "";
@@ -116,7 +136,9 @@ function construction404(stage, svg, opts = {}) {
   // register draws the first frame at once; the kernel clamps dt to 50ms
   const loop = register(stage, (dt) => {
     if (still()) { draw(); return false; }
+    audible = true;       // only the live clock makes sound, never a skip ahead
     advance(dt);
+    audible = false;
     draw();
     return true;
   });

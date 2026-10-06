@@ -36,6 +36,8 @@ console.log(out);
 const i = process.argv.indexOf("--fragment");
 if (i > 0 && process.argv[i + 1]) {
   const frag = resolve(process.argv[i + 1]);
-  writeFileSync(frag, `${head.trim()}\n${body.trim()}\n`);
+  // The preview keeps its own name; the page itself says what a visitor needs in the tab.
+  const named = head.trim().replace("<title>Page not found</title>", "<title>Construction 404</title>");
+  writeFileSync(frag, `${named}\n${body.trim()}\n`);
   console.log(frag);
 }

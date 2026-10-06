@@ -7,26 +7,35 @@
  * to it. When the last block is set the sign lights up, shakes, and breaks
  * again, and the work starts over.
  *
+ * Any block in place can be knocked out: click or tap it, or pick it with the
+ * arrow keys and press Enter. It falls with every block stacked on it, and
+ * its crane puts them back, always from the bottom of a column up.
+ *
  * Drawn on the Hairline kernel (HL): rounded solids in one stroke, opaque
  * plates painted back to front, and one frame loop that sleeps off screen.
  *
- * construction404(stage, svg, { t, freeze, onRead }) → { destroy }
- *   stage   the element carrying data-hairline; it gets the pointer
- *   svg     an <svg viewBox="0 0 800 450"> inside it
- *   t       seconds to run the site forward before the first frame
- *   freeze  draw that one frame and stop
- *   onRead  called with a short status: "fixing 3/8", "fixed", "breaking"
+ * construction404(stage, svg, opts) → { destroy, aspect, knock, advance, snapshot, time }
+ *   stage       the element carrying data-hairline; it gets the pointer and the keys
+ *   svg         an <svg> inside it; the scene sets its viewBox
+ *   opts.frame  "full" (the whole site, about 16:9) or "core" (the 404 and both cranes, for a tall screen)
+ *   opts.t      seconds to run the site forward before the first frame
+ *   opts.freeze draw that one frame and stop
+ *   opts.onRead     a short status: "fixing 3/8", "fixed", "breaking"
+ *   opts.onAnnounce a sentence for a live region, after something the reader did
+ *   opts.onKnock    the number of blocks the reader has knocked out
+ *   aspect      the viewBox's width over its height, for sizing the stage
  */
 function construction404(stage, svg, opts = {}) {
   const {
     Cam, proj, fit, rrect, circ, prism, ringAt, run, hull, poly, open, seg, clamp, lerp, rad, r2,
-    mk, solid, place, register, disposer, reducedMotion,
+    mk, solid, place, register, disposer, reducedMotion, spring, stepS,
   } = HL;
   const bag = disposer();
-  const onRead = opts.onRead || (() => {});
+  const noop = () => {};
+  const onRead = opts.onRead || noop, onAnnounce = opts.onAnnounce || noop, onKnock = opts.onKnock || noop;
 
   // ---------------------------------------------------------------- camera
-  const VW = 800, VH = 450, AZ = opts.az ?? 20, K = opts.k ?? 0.45;
+  const VW = 800, AZ = 20, K = 0.45, CORE = opts.frame === "core";
   const sA = Math.sin(rad(AZ)), cA = Math.cos(rad(AZ)), ZF = Math.sqrt(1 - K * K);
   /** Toward the viewer, for normals that are not horizontal. */
   const VIEW = [sA * ZF, cA * ZF, K];
@@ -61,26 +70,37 @@ function construction404(stage, svg, opts = {}) {
     slots.push({ col, lvl, x0: col * PITCH, z0: lvl * PITCH, cx: col * PITCH + SZ / 2, cy: SD / 2, spot: BROKEN[col + "," + lvl] });
   })));
   const slotAt = (col, lvl) => slots.find((s) => s.col === col && s.lvl === lvl);
+  for (const s of slots) { s.up = slotAt(s.col, s.lvl + 1); s.left = slotAt(s.col - 1, s.lvl); s.right = slotAt(s.col + 1, s.lvl); }
   const broken = slots.filter((s) => s.spot);
 
-  // Fit the camera to the ground, the crane heads, and every pose the jibs reach.
-  const C = Cam(AZ, K, 1);
-  const fitPts = [];
-  for (const x of [GROUND[0], GROUND[2]]) for (const y of [GROUND[1], GROUND[3]]) fitPts.push([x, y, -6]);
-  for (const k of CRANES) {
-    fitPts.push([k.x, k.y, k.H + 34]);
-    for (const s of broken.filter((s) => k.take(s.col))) for (const [x, y] of [[s.cx, s.cy], s.spot]) {
-      const a = Math.atan2(y - k.y, x - k.x);
-      fitPts.push([k.x + JIB * Math.cos(a), k.y + JIB * Math.sin(a), k.H + 9], [k.x - 58 * Math.cos(a), k.y - 58 * Math.sin(a), k.H + 9]);
+  // Frame the camera. "full" holds the ground, the crane heads, and every pose the
+  // jibs reach. "core" holds the 404, both masts and the crew in front, and lets
+  // the ground and the jibs run off the edges, so a tall screen gets a big site.
+  // The viewBox is 800 wide and as tall as what it holds.
+  const C = Cam(AZ, K, 1), fitPts = [], MARGIN = CORE ? 6 : 12;
+  if (CORE) {
+    for (const k of CRANES) fitPts.push([k.x - 14, k.y - 14, 0], [k.x + 14, k.y + 14, 0], [k.x, k.y, k.H + 34], [k.x, 124, 0]);
+    fitPts.push([0, 0, 5 * PITCH], [10 * PITCH + SZ, SD, 0]);
+  } else {
+    for (const x of [GROUND[0], GROUND[2]]) for (const y of [GROUND[1], GROUND[3]]) fitPts.push([x, y, -6]);
+    for (const k of CRANES) {
+      fitPts.push([k.x, k.y, k.H + 34]);
+      for (const s of broken.filter((s) => k.take(s.col))) for (const [x, y] of [[s.cx, s.cy], s.spot]) {
+        const a = Math.atan2(y - k.y, x - k.x);
+        fitPts.push([k.x + JIB * Math.cos(a), k.y + JIB * Math.sin(a), k.H + 9], [k.x - 58 * Math.cos(a), k.y - 58 * Math.sin(a), k.H + 9]);
+      }
     }
   }
+  let VH;
   {
     const P1 = proj(C);
     let a = 1e9, b = -1e9, c = 1e9, d = -1e9;
     for (const p of fitPts) { const q = P1(p[0], p[1], p[2]); a = Math.min(a, q[0]); b = Math.max(b, q[0]); c = Math.min(c, q[1]); d = Math.max(d, q[1]); }
-    C.S = Math.min((VW - 24) / (b - a), (VH - 24) / (d - c));
+    C.S = (VW - 2 * MARGIN) / (b - a);
+    VH = Math.round((d - c) * C.S + 2 * MARGIN);
     fit(C, fitPts, VW / 2, VH / 2);
   }
+  svg.setAttribute("viewBox", `0 0 ${VW} ${VH}`);
   const P = proj(C), S = C.S;
   const P3 = (p) => P(p[0], p[1], p[2]);
 
@@ -198,48 +218,71 @@ function construction404(stage, svg, opts = {}) {
   }
 
   // ---------------------------------------------------------------- the 404
-  /** A crack on a block's front face, running in from the side its missing neighbour was on. */
-  function crackPath(b, from) {
-    const fy = SD + 0.05, x0 = b.x0, z0 = b.z0, j = ((b.col * 7 + b.lvl * 3) % 5) / 5, q = SZ / 11;
-    const pts = from === "top"
-      ? [[3 + j * 3, 11], [5 + j, 8], [3.8, 6.2], [6, 3.6]]
-      : from === "left"
-        ? [[0, 6 + j * 2], [3, 7.4], [4.6, 5], [7.4, 5.8]]
-        : [[11, 6 + j * 2], [8, 4.4], [6.2, 6.4], [3.8, 5]];
-    return open(pts.map(([x, z]) => P(x0 + x * q, fy, z0 + z * q)));
+  /** Cracks on a block's front face, in face units (x across, z up, 11 square), by the side its missing neighbour is on. */
+  const CRACKS = {
+    t: [[3, 11], [5, 8], [3.8, 6.2], [6, 3.6]],
+    l: [[0, 6], [3, 7.4], [4.6, 5], [7.4, 5.8]],
+    r: [[11, 6], [8, 4.4], [6.2, 6.4], [3.8, 5]],
+  };
+  const out = (q) => q && q.block.state !== "slot";
+  /** Which of a block's faces show a crack: "t" when the one above is out, "l" and "r" for its sides. */
+  const crackFlags = (b) => {
+    if (b.state !== "slot") return "";
+    const s = b.slot;
+    return (out(s.up) ? "t" : "") + (out(s.left) ? "l" : "") + (out(s.right) ? "r" : "");
+  };
+  function crackD(s, flags, dx, dy, dz) {
+    const j = ((s.col * 7 + s.lvl * 3) % 5) / 5, q = SZ / 11, fy = SD + dy + 0.05;
+    let d = "";
+    for (const f of flags) {
+      const pts = CRACKS[f].map(([x, z], i) => (i ? [x, z] : f === "t" ? [x + j * 3, z] : [x, z + j * 2]));
+      d += open(pts.map(([x, z]) => P(s.x0 + dx + x * q, fy, s.z0 + dz + z * q)));
+    }
+    return d;
   }
 
   const blocks = slots.map((s) => {
-    const g = mk("g", {}, layer);
-    const el = solid(g), crack = mk("path", { class: "nf sil" }, g);
-    const b = { slot: s, x: s.cx, y: s.cy, z: s.z0, yaw: 0, state: "slot", el, crack, it: item(g), drawn: "", dust: [] };
+    const g = mk("g", {}, layer), el = { g };
+    el.sil = mk("path", { class: "sil blk" }, g);
+    el.top = mk("path", { class: "fo blk-top" }, g);
+    el.cr = mk("path", { class: "nf sil" }, g);
+    el.crack = mk("path", { class: "nf sil" }, g);
+    const b = { slot: s, x: s.cx, y: s.cy, z: s.z0, yaw: 0, state: "slot", el, it: item(g), drawn: "", nudge: spring(0, { eps: 0.02 }) };
     s.block = b;
     if (s.spot) { b.x = s.spot[0]; b.y = s.spot[1]; b.z = 0; b.yaw = rad(s.spot[2]); b.state = "ground"; }
+    // where the pointer finds it: its rest pose, which never moves
+    const ring = rring(s.cx, s.cy, 0, -SZ / 2, -SD / 2, SZ / 2, SD / 2, 2.4);
+    s.hit = hull(ringAt(P, ring, s.z0).concat(ringAt(P, ring, s.z0 + SZ)));
+    s.mid = P(s.cx, s.cy, s.z0 + SZ / 2);
+    s.key = depth(s.cx, s.cy) + s.z0 * 1e-3;
     return b;
   });
-  // Where a missing block leaves a crack in the block next to it.
-  const cracks = [];
-  for (const s of broken) {
-    const below = slotAt(s.col, s.lvl - 1), left = slotAt(s.col - 1, s.lvl), right = slotAt(s.col + 1, s.lvl);
-    const n = below && !below.spot ? [below, "top"] : left && !left.spot ? [left, "right"] : right && !right.spot ? [right, "left"] : null;
-    if (n) cracks.push({ gap: s, on: n[0].block, d: crackPath(n[0], n[1]) });
-  }
-  // A dashed outline where each missing block goes.
-  const ghosts = broken.map((s) => {
+  // A dashed outline wherever a block is out.
+  const ghosts = slots.map((s) => {
     const g = mk("g", {}, layer);
     const d = rbox(s.cx, s.cy, 0, -SZ / 2, -SD / 2, SZ / 2, SD / 2, s.z0, s.z0 + SZ, 2.4, 0).sil;
-    return { s, d, el: mk("path", { class: "nf dash hi" }, g), it: item(g, depth(s.cx, s.cy) + s.z0 * 1e-3 - 1e-4) };
+    return { s, d, el: mk("path", { class: "nf dash hi" }, g), it: item(g, s.key - 1e-4) };
   });
-
+  /** A loose block, one a press would knock out, slides a little toward the viewer and rises a little. */
   function drawBlock(b, dx = 0, dz = 0) {
-    const key = r2(b.x + dx) + "," + r2(b.y) + "," + r2(b.z + dz) + "," + r2(b.yaw);
-    if (key !== b.drawn) { b.drawn = key; putC(b.el, rbox(b.x + dx, b.y, b.yaw, -SZ / 2, -SD / 2, SZ / 2, SD / 2, b.z + dz, b.z + dz + SZ, 2.4, 1)); }
+    const n = b.nudge.x, y = b.y + n, z = b.z + dz + n * 0.4, flags = crackFlags(b);
+    const key = r2(b.x + dx) + "," + r2(y) + "," + r2(z) + "," + r2(b.yaw) + flags;
+    if (key !== b.drawn) {
+      b.drawn = key;
+      const ring = rring(b.x + dx, y, b.yaw, -SZ / 2, -SD / 2, SZ / 2, SD / 2, 2.4);
+      const inner = rring(b.x + dx, y, b.yaw, -SZ / 2 + 1, -SD / 2 + 1, SZ / 2 - 1, SD / 2 - 1, 1.4);
+      const p = prism(P, front, ring, inner, z, z + SZ);
+      setD(b.el.sil, p.sil);
+      setD(b.el.top, poly(ringAt(P, ring, z + SZ)));
+      setD(b.el.cr, p.crease);
+      setD(b.el.crack, flags ? crackD(b.slot, flags, dx, n, z - b.slot.z0) : "");
+    }
     b.it.key = depth(b.x, b.y) + b.z * 1e-3;
   }
 
   // ---------------------------------------------------------------- cranes
   function makeCrane(c) {
-    const k = { ...c, th: c.park, r: 64, h: SAFE, steps: [], cur: null, job: null, queue: [], sx: 0, sy: 0, svx: 0, svy: 0, tp: null, tv: [0, 0], side: null };
+    const k = { ...c, th: c.park, r: 64, h: SAFE, steps: [], cur: null, job: null, mode: null, spot: null, sx: 0, sy: 0, svx: 0, svy: 0, tp: null, tv: [0, 0], side: null };
     const { x, y, H } = c;
     // footing, mast and its lattice
     const g = mk("g", {}, layer);
@@ -315,24 +358,59 @@ function construction404(stage, svg, opts = {}) {
   /** The trolley's radius and the jib's angle that put the hook over (px, py). */
   const polar = (k, px, py) => [Math.atan2(py - k.y, px - k.x), Math.hypot(px - k.x, py - k.y)];
 
+  /** A slot can take its block only once every slot below it in its column is filled, so nothing is ever set above a gap. */
+  const placeable = (s) => slots.every((o) => o.col !== s.col || o.lvl >= s.lvl || o.block.state === "slot");
+  const hookAt = (k) => [k.x + k.r * Math.cos(k.th) + k.sx, k.y + k.r * Math.sin(k.th) + k.sy];
+
+  /** The next block for this crane: one on the ground, in its columns, that can go back now; lowest first, then nearest. */
+  function pickJob(k) {
+    const [hx, hy] = hookAt(k);
+    let best = null, score = 0;
+    for (const b of blocks) {
+      if (b.state !== "ground" || !k.take(b.slot.col) || !placeable(b.slot)) continue;
+      const sc = b.slot.lvl * 40 + Math.hypot(b.x - hx, b.y - hy);
+      if (!best || sc < score) { best = b; score = sc; }
+    }
+    return best;
+  }
+
   function planJob(k, b) {
     const s = b.slot, [pt, pr] = polar(k, b.x, b.y), [st, sr] = polar(k, s.cx, s.cy);
-    k.job = b;
+    k.job = b; k.mode = "place";
     k.steps.push(
       { h: SAFE }, { th: pt, r: pr }, { h: HOOK_GROUND, low: true },
       { wait: 0.6, low: true, then: () => { b.state = "carried"; } },
-      { h: SAFE }, { th: st, r: sr }, { h: s.z0 + SZ + 2 + SL, low: true, place: true },
-      { wait: 0.5, low: true, place: true, then: () => { Object.assign(b, { state: "slot", x: s.cx, y: s.cy, z: s.z0, yaw: 0 }); k.job = null; } },
+      { h: SAFE }, { th: st, r: sr }, { h: s.z0 + SZ + 2 + SL, low: true },
+      { wait: 0.5, low: true, then: () => { Object.assign(b, { state: "slot", x: s.cx, y: s.cy, z: s.z0, yaw: 0 }); k.job = null; k.mode = null; placedN++; } },
       { h: SAFE },
     );
   }
 
+  /** A block below the job's slot was knocked out: drop a job not yet hooked, or set the load down on the ground. */
+  function abandon(k) {
+    const b = k.job;
+    k.steps = [];
+    if (b.state !== "carried") { k.job = null; k.mode = null; return; }
+    const spot = findSpot(b.slot, k), [th, r] = polar(k, spot[0], spot[1]);
+    k.mode = "setdown"; k.spot = spot;
+    k.steps.push(
+      { h: SAFE }, { th, r }, { h: HOOK_GROUND, low: true },
+      { wait: 0.5, low: true, then: () => { Object.assign(b, { state: "ground", z: 0 }); k.job = null; k.mode = null; k.spot = null; } },
+      { h: SAFE },
+    );
+  }
+
+  const parked = (k) => Math.abs(wrap(k.park - k.th)) < 0.01 && Math.abs(k.r - 64) < 0.5 && Math.abs(k.h - SAFE) < 0.5;
+
   function craneStep(k, dt) {
+    // an idle wait gives way at once to new work
+    if (k.cur && k.cur.idle && clock > 0.8 && pickJob(k)) k.cur = null;
     if (!k.cur) {
       if (!k.steps.length) {
-        if (k.queue.length) planJob(k, k.queue.shift());
-        else if (Math.abs(wrap(k.park - k.th)) > 0.01 || Math.abs(k.r - 64) > 0.5 || Math.abs(k.h - SAFE) > 0.5) k.steps.push({ h: SAFE }, { th: k.park, r: 64 });
-        else k.steps.push({ wait: 0.3 });
+        const b = clock > 0.8 ? pickJob(k) : null;
+        if (b) planJob(k, b);
+        else if (!parked(k)) k.steps.push({ h: SAFE }, { th: k.park, r: 64 });
+        else k.steps.push({ wait: 0.3, idle: true });
       }
       const st = k.steps.shift();
       st.t = 0;
@@ -347,7 +425,12 @@ function construction404(stage, svg, opts = {}) {
     const e = smooth(clamp(st.t / st.dur, 0, 1));
     if (st.th != null) { k.th = st.f.th + st.dth * e; k.r = lerp(st.f.r, st.r, e); }
     if (st.h != null) k.h = lerp(st.f.h, st.h, e);
-    if (st.t >= st.dur) { k.cur = null; if (st.then) st.then(); }
+    if (st.t >= st.dur) {
+      k.cur = null;
+      // checked at every step's end, before its hook or release runs
+      if (k.mode === "place" && !placeable(k.job.slot)) { abandon(k); return; }
+      if (st.then) st.then();
+    }
   }
 
   /** The load swings on its cable: a pendulum driven by the trolley's acceleration, held still near the ground. */
@@ -605,25 +688,76 @@ function construction404(stage, svg, opts = {}) {
   const people = [boss, ...signals, watcher, pusher, shovel, carrier];
 
   // ---------------------------------------------------------------- the story
-  let phase = "rest", pt = 0, clock = 0, read = "";
+  let phase = "repair", pt = 0, clock = 0, read = "", seq = 0;
+  /** Blocks out and blocks put back since the 404 was last whole, and blocks the reader has knocked out. */
+  let lost = broken.length, placedN = 0, knocked = 0, byReader = false;
   const debris = [];
-  const placedCount = () => broken.filter((s) => s.block.state === "slot").length;
+  const craneFor = (s) => cranes.find((k) => k.take(s.col));
+
+  /** Ground already spoken for: blocks lying there or falling there, and loads on their way down. */
+  function taken() {
+    const t = [];
+    for (const b of blocks) {
+      if (b.state === "ground") t.push([b.x, b.y]);
+      else if (b.state === "falling") t.push([b.fall.x1, b.fall.y1]);
+    }
+    for (const k of cranes) if (k.spot) t.push(k.spot);
+    return t;
+  }
+  const clear = (x, y, t) => t.every(([tx, ty]) => Math.hypot(x - tx, y - ty) >= 20.5);
+
+  /** Where a block from slot s can land: clear ground in front of the 404, in reach of its crane, near its column. */
+  function findSpot(s, k) {
+    const t = taken();
+    const keep = [[...PILE, 28], [...MIXER, 26], [...PALLET, 22], [124, 100, 14], [180, 100, 14], [206, 90, 14], [...DUMP, 18], ...cranes.map((c) => [c.x, c.y, 28])];
+    let best = null;
+    for (let x = -44; x <= 206; x += 7) for (let y = 30; y <= 94; y += 8) {
+      const d = Math.hypot(x - k.x, y - k.y);
+      if (d < 32 || d > JIB - 12 || !clear(x, y, t) || keep.some(([kx, ky, r]) => Math.hypot(x - kx, y - ky) < r)) continue;
+      const score = Math.abs(x - s.cx) + Math.abs(y - 44) * 1.6;
+      if (!best || score < best[3]) best = [x, y, ((seq * 47) % 50) - 25, score];
+    }
+    return best ? best.slice(0, 3) : [s.cx, 22, 0];
+  }
+
+  /** Knocks the block in slot s out, with every block standing on it in its column. Returns how many fell. */
+  function knockOut(s, o = {}) {
+    if (s.block.state !== "slot") return 0;
+    const stack = slots.filter((q) => q.col === s.col && q.lvl >= s.lvl && q.block.state === "slot").sort((a, b) => a.lvl - b.lvl);
+    stack.forEach((q, i) => {
+      const b = q.block, spot = !o.byReader && q.spot && clear(q.spot[0], q.spot[1], taken()) ? q.spot : findSpot(q, craneFor(q));
+      seq++;
+      if (still()) { Object.assign(b, { state: "ground", x: spot[0], y: spot[1], z: 0, yaw: rad(spot[2]) }); return; }
+      b.state = "falling";
+      b.fall = { t: -((o.delay || 0) + i * 0.12), x0: q.cx, y0: q.cy, z0: q.z0, x1: spot[0], y1: spot[1], yaw: rad(spot[2]) + (seq % 2 ? TAU : -TAU) * 0.5, dur: 0.75 + q.z0 / 160 };
+    });
+    lost += stack.length;
+    if (phase !== "repair") { phase = "repair"; pt = 0; }
+    if (o.byReader) {
+      knocked += stack.length; byReader = true;
+      onKnock(knocked);
+      onAnnounce(stack.length === 1 ? "You knocked out a block. A crane will put it back." : `You knocked out ${stack.length} blocks. A crane will put them back.`);
+    }
+    return stack.length;
+  }
+
+  /** Without motion there is no crane to watch, so a block that is out goes straight back. */
+  function putBack(s) {
+    Object.assign(s.block, { state: "slot", x: s.cx, y: s.cy, z: s.z0, yaw: 0 });
+    placedN++;
+    onAnnounce("The block is back in place.");
+  }
 
   function director(dt) {
     pt += dt;
-    if (phase === "rest" && pt > 0.8) {
-      for (const k of cranes) k.queue = broken.filter((s) => k.take(s.col)).sort((a, b) => a.lvl - b.lvl || a.col - b.col).map((s) => s.block);
-      phase = "repair"; pt = 0;
-    } else if (phase === "repair" && placedCount() === broken.length) { phase = "fixed"; pt = 0; }
-    else if (phase === "fixed" && pt > 3.6) { phase = "shake"; pt = 0; }
+    if (phase === "repair" && lost > 0 && blocks.every((b) => b.state === "slot")) {
+      phase = "fixed"; pt = 0; lost = 0; placedN = 0;
+      if (byReader) { byReader = false; onAnnounce("Every block is back in place."); }
+    } else if (phase === "fixed" && pt > 3.6) { phase = "shake"; pt = 0; }
     else if (phase === "shake" && pt > 0.8) {
-      phase = "break"; pt = 0;
-      broken.slice().sort((a, b) => b.lvl - a.lvl || a.col - b.col).forEach((s, i) => {
-        const b = s.block;
-        b.state = "falling";
-        b.fall = { t: -i * 0.11, x0: s.cx, y0: s.cy, z0: s.z0, x1: s.spot[0], y1: s.spot[1], yaw: rad(s.spot[2]) + (i % 2 ? TAU : -TAU) * 0.5, dur: 0.75 + s.z0 / 160 };
-      });
-    } else if (phase === "break" && broken.every((s) => s.block.state === "ground")) { phase = "rest"; pt = 0; }
+      phase = "repair"; pt = 0;
+      broken.slice().sort((a, b) => b.lvl - a.lvl || a.col - b.col).forEach((q, i) => knockOut(q, { delay: i * 0.11 }));
+    }
   }
 
   function fall(b, dt) {
@@ -685,7 +819,8 @@ function construction404(stage, svg, opts = {}) {
       const k = p.k, b = k.job;
       p.t += dt;
       let to = p.k.home, look = [k.x + k.r * Math.cos(k.th), k.y + k.r * Math.sin(k.th)];
-      if (b && b.state === "ground") { to = [b.x + 3, b.y + 17]; look = [b.x, b.y]; }
+      if (k.mode === "setdown") { to = [k.spot[0] + 3, k.spot[1] + 17]; look = k.spot; }
+      else if (b && b.state === "ground") { to = [b.x + 3, b.y + 17]; look = [b.x, b.y]; }
       else if (b) { to = [b.slot.cx + 3, 30]; look = [b.slot.cx, b.slot.cy]; }
       const there = walkTo(p, to[0], to[1], dt);
       if (there) turnTo(p, toward(p, look), dt, 4);
@@ -713,7 +848,10 @@ function construction404(stage, svg, opts = {}) {
     clock += dt;
     director(dt);
     for (const k of cranes) { craneStep(k, dt); swing(k, dt); }
-    for (const s of broken) if (s.block.state === "falling") fall(s.block, dt);
+    for (const b of blocks) {
+      if (b.state === "falling") fall(b, dt);
+      stepS(b.nudge, dt);
+    }
     updatePeople(dt);
     mixer.spin += dt * 1.6;
     for (let i = debris.length - 1; i >= 0; i--) {
@@ -725,14 +863,19 @@ function construction404(stage, svg, opts = {}) {
   }
 
   function draw() {
-    const shaking = phase === "shake", lit = phase === "fixed";
+    const shaking = phase === "shake", lit = phase === "fixed", on = active();
+    // what a press on the marked block would bring down: it and every block standing on it
+    const loose = on && isIn(on) ? (q) => q.col === on.col && q.lvl >= on.lvl : () => false;
     for (const b of blocks) {
+      const picked = b.state === "slot" && loose(b.slot);
+      b.nudge.t = picked ? 3 : 0;
+      if (still()) b.nudge.x = b.nudge.t;
       const dx = shaking && b.state === "slot" ? Math.sin(pt * 70 + b.slot.col * 1.7) * 0.9 * (1 - pt / 0.8) : 0;
       const w = pt - 0.2 - b.slot.col * 0.06, dz = lit && w > 0 && w < 0.5 ? 3.2 * Math.sin((w / 0.5) * Math.PI) : 0;
       drawBlock(b, dx, dz);
       flag(b.el.sil, "hi", b.state !== "ground");
+      flag(b.el.g, "loose", picked);
     }
-    for (const c of cracks) setD(c.on.crack, c.gap.block.state === "slot" ? "" : c.d);
     for (const g of ghosts) setD(g.el, g.s.block.state === "slot" ? "" : g.d);
     for (const k of cranes) drawCrane(k);
     for (const p of people) drawPerson(p);
@@ -743,28 +886,111 @@ function construction404(stage, svg, opts = {}) {
     let sorted = true;
     for (let i = 1; i < items.length; i++) if (items[i].key < items[i - 1].key) { sorted = false; break; }
     if (!sorted) { items.sort((a, b) => a.key - b.key); for (const it of items) layer.appendChild(it.g); }
-    const text = phase === "fixed" ? "fixed" : phase === "shake" || phase === "break" ? "breaking" : `fixing ${placedCount()}/${broken.length}`;
+    const text = phase === "fixed" ? "fixed" : phase === "shake" ? "breaking" : `fixing ${placedN}/${lost}`;
     if (text !== read) { read = text; onRead(text); }
   }
 
   // ---------------------------------------------------------------- life
   const advance = (sec) => { let left = sec; while (left > 1e-6) { const h = Math.min(left, 1 / 90); sim(h); left -= h; } };
-  let rate = 1, rateT = 1;
+  const still = () => !!opts.freeze || reducedMotion();
   advance(Math.max(0, opts.t || 0));
-  const still = () => opts.freeze || reducedMotion();
   if (reducedMotion() && !opts.t) advance(8.6); // a still with both cranes at work
-  const B = register(stage, (dt) => {
+  // the block under the pointer, and the one picked with the keys
+  let hover = null, sel = null;
+  const active = () => hover || sel;
+  // register draws the first frame at once; the kernel clamps dt to 50ms
+  const loop = register(stage, (dt) => {
     if (still()) { draw(); return false; }
-    rate += (rateT - rate) * Math.min(1, dt * 4);
-    advance(dt * rate);
+    advance(dt);
     draw();
     return true;
   });
-  bag.add(B.unregister);
-  // hovering slows the site down, so a lift can be followed
-  bag.on(stage, "pointerenter", (e) => { if (e.pointerType === "mouse") { rateT = 0.35; B.wake(); } });
-  bag.on(stage, "pointerleave", () => { rateT = 1; B.wake(); });
-  bag.add(() => svg.replaceChildren());
+  bag.add(loop.unregister);
+  const poke = () => { if (still()) draw(); else loop.wake(); };
 
-  return { destroy: bag.dispose, time: () => clock };
+  // ---- the reader's hand: hover marks a block, a press knocks it out
+  const inside = (poly, [x, y]) => {
+    let sign = 0;
+    for (let i = 0; i < poly.length; i++) {
+      const [ax, ay] = poly[i], [bx, by] = poly[(i + 1) % poly.length], c = (bx - ax) * (y - ay) - (by - ay) * (x - ax);
+      if (c) { if (!sign) sign = Math.sign(c); else if (Math.sign(c) !== sign) return false; }
+    }
+    return true;
+  };
+  const isIn = (s) => s.block.state === "slot";
+  const isOut = (s) => s.block.state === "ground";
+  /** The nearest slot whose rest pose holds the point; a finger also gets the nearest within half a block. */
+  function slotAtPoint(p, want, finger) {
+    let best = null;
+    for (const s of slots) if (want(s) && inside(s.hit, p) && (!best || s.key > best.key)) best = s;
+    if (best || !finger) return best;
+    let d0 = 0.75 * SZ * S;
+    for (const s of slots) { const d = want(s) && Math.hypot(p[0] - s.mid[0], p[1] - s.mid[1]); if (d !== false && d < d0) { best = s; d0 = d; } }
+    return best;
+  }
+  const toView = (e) => {
+    const m = svg.getScreenCTM();
+    if (!m) return [-1, -1];
+    const q = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse());
+    return [q.x, q.y];
+  };
+  const setHover = (s) => { if (s !== hover) { hover = s; stage.style.cursor = s ? "pointer" : ""; poke(); } };
+
+  bag.on(stage, "pointermove", (e) => { if (e.pointerType === "mouse") setHover(slotAtPoint(toView(e), isIn, false)); });
+  bag.on(stage, "pointerleave", () => setHover(null));
+  bag.on(stage, "pointerdown", (e) => {
+    if (e.button !== 0) return;
+    const p = toView(e), finger = e.pointerType !== "mouse";
+    const s = slotAtPoint(p, isIn, finger);
+    if (s) { knockOut(s, { byReader: true }); hover = null; stage.style.cursor = ""; poke(); return; }
+    if (still()) { const g = slotAtPoint(p, isOut, finger); if (g) { putBack(g); poke(); } }
+  });
+
+  // ---- the keys: arrows walk the blocks, Enter or Space knocks one out
+  const DIRS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
+  function walk(from, [dc, dl]) {
+    if (!from) return slots.filter(isIn).sort((a, b) => Math.hypot(a.col - 5, a.lvl - 2) - Math.hypot(b.col - 5, b.lvl - 2))[0] || slots[0];
+    let best = null, score = 0;
+    for (const s of slots) {
+      const along = dc ? (s.col - from.col) * dc : (s.lvl - from.lvl) * dl, across = dc ? Math.abs(s.lvl - from.lvl) : Math.abs(s.col - from.col);
+      if (along <= 0) continue;
+      const sc = along + across * 3;
+      if (!best || sc < score) { best = s; score = sc; }
+    }
+    return best || from;
+  }
+  const say = (s) => onAnnounce(isIn(s) ? "Block in place. Press Enter to knock it out." : "Block out. A crane will put it back.");
+  bag.on(stage, "keydown", (e) => {
+    if (e.metaKey || e.ctrlKey || e.altKey) return;
+    if (DIRS[e.key]) { e.preventDefault(); sel = walk(sel, DIRS[e.key]); say(sel); poke(); return; }
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      if (!sel) { sel = walk(null); say(sel); }
+      else if (isIn(sel)) knockOut(sel, { byReader: true });
+      else if (still() && isOut(sel)) putBack(sel);
+      else say(sel);
+      poke();
+      return;
+    }
+    if (e.key === "Escape" && sel) { sel = null; poke(); }
+  });
+  bag.on(stage, "blur", () => { if (sel) { sel = null; poke(); } });
+  bag.add(() => { svg.replaceChildren(); stage.style.cursor = ""; });
+
+  return {
+    destroy: bag.dispose,
+    aspect: VW / VH,
+    time: () => clock,
+    /** Knocks out the block at a column and level, as a press would. Returns how many fell. */
+    knock: (col, lvl) => { const s = slotAt(col, lvl), n = s ? knockOut(s, { byReader: true }) : 0; poke(); return n; },
+    /** Where a block's rest pose sits, in viewBox units. */
+    where: (col, lvl) => { const s = slotAt(col, lvl); return s ? s.mid.slice() : null; },
+    /** Runs the site forward, for tests and for skipping ahead. */
+    advance: (sec) => { advance(sec); draw(); },
+    snapshot: () => ({
+      phase, lost, placed: placedN, knocked,
+      blocks: blocks.map((b) => ({ col: b.slot.col, lvl: b.slot.lvl, state: b.state, x: b.x, y: b.y })),
+      cranes: cranes.map((k) => ({ job: k.job && `${k.job.slot.col},${k.job.slot.lvl}`, mode: k.mode, h: k.h })),
+    }),
+  };
 }

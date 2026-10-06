@@ -1,122 +1,87 @@
-<title>Construction 404</title>
+<title>Page not found</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..400&display=swap">
 <style>
-  /* Layout: the site itself is the hero, full width; under it the notice and the site board sit side by side, stacked on a phone. */
+  /* Layout: one centred column. The site takes as much of the screen as its shape allows, up to 80% of the
+     height; the one line sits under it. On a tall screen the site runs edge to edge. */
   :root {
     color-scheme: light;
-    --bg: #ffffff;          /* the same as the drawing's plates, so the site sits on the page */
-    --ink: #1d1e22;
-    --muted: #686a73;
-    --rule: #e2e2e7;
-    --accent: #9a6400;      /* safety amber, darkened for white */
-    --accent-ink: #ffffff;
-    --line-edge: #8e8f98;   /* the drawing's silhouettes */
-    --line-mid: #b6b7be;    /* its other strokes */
-    --display: "Big Shoulders Stencil Display", "Arial Narrow", "Roboto Condensed", sans-serif;
-    --body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
-    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    /* neutrals carry a slight cool bias (hue 260) so the greys read as one family */
+    --bg: oklch(0.985 0.003 255);         /* page, and every plate in the drawing */
+    --ink: oklch(0.24 0.012 260);         /* the line, the 404's edges, the one highlight */
+    --line-edge: oklch(0.63 0.012 260);   /* silhouettes of everything else */
+    --line-mid: oklch(0.79 0.008 260);    /* inner strokes */
+    --line-lo: oklch(0.9 0.005 260);      /* what recedes */
+    --block-face: oklch(0.87 0.006 260);  /* the blocks' sides */
+    --block-top: oklch(0.94 0.004 260);   /* the blocks' tops, lit from above */
+    --loose-face: oklch(0.78 0.008 260);  /* a block a press would knock out */
+    --loose-top: oklch(0.86 0.006 260);
+    --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
       color-scheme: dark;
-      --bg: #08090a; --ink: #d4d9e2; --muted: #8a8c96; --rule: #26272c; --accent: #f2b33d; --accent-ink: #08090a;
-      --line-edge: #62646c; --line-mid: #404148;
+      --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
+      --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
+      --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260);
+      --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260);
     }
   }
   :root[data-theme="dark"] {
     color-scheme: dark;
-    --bg: #08090a; --ink: #d4d9e2; --muted: #8a8c96; --rule: #26272c; --accent: #f2b33d; --accent-ink: #08090a;
-    --line-edge: #62646c; --line-mid: #404148;
+    --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
+    --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
+    --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260);
+    --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260);
   }
 
   * { box-sizing: border-box; }
-  body {
-    margin: 0; background: var(--bg); color: var(--ink);
-    font: 400 16px/1.6 var(--body); -webkit-font-smoothing: antialiased;
-  }
-  .site { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 56px; }
+  html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); }
 
-  /* The site keeps its 16:9 frame, and gives up width on a short screen so the notice still shows under it. */
+  main {
+    min-height: 100vh; min-height: 100svh;
+    display: grid; align-content: center; justify-items: center;
+    row-gap: clamp(12px, 3svh, 32px);
+    padding-block: 2svh;
+  }
+
   .stage {
-    width: min(100%, max(560px, (100vh - 380px) * 16 / 9));
-    width: min(100%, max(560px, (100svh - 380px) * 16 / 9));
-    max-width: 100%; aspect-ratio: 800 / 450; margin-inline: auto;
-    /* the drawing takes its five strokes from the page's tokens, so its plates match the page */
+    --aspect: 1.78;
+    aspect-ratio: var(--aspect);
+    width: min(calc(100% - 32px), calc(80vh * var(--aspect)));
+    width: min(calc(100% - 32px), calc(80svh * var(--aspect)));
+    max-width: 100%;
+    border-radius: 12px;
+    -webkit-tap-highlight-color: transparent;
+    /* the drawing takes its strokes from the page's tokens, so its plates match the page */
     --hairline-plate: var(--bg); --hairline-hi: var(--ink); --hairline-edge: var(--line-edge);
-    --hairline-mid: var(--line-mid); --hairline-lo: var(--rule);
+    --hairline-mid: var(--line-mid); --hairline-lo: var(--line-lo);
   }
-  .tag {
-    position: absolute; top: 2.5%; z-index: 1; pointer-events: none;
-    font: 500 11px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
-  }
-  .tag.name { left: 1.5%; }
-  .tag.read { right: 1.5%; color: var(--ink); font-variant-numeric: tabular-nums; }
+  .stage[data-frame="core"] { width: min(100%, calc(80svh * var(--aspect))); border-radius: 0; }
+  .stage .blk { fill: var(--block-face); }
+  .stage .blk-top { fill: var(--block-top); }
+  .stage .loose .blk { fill: var(--loose-face); }
+  .stage .loose .blk-top { fill: var(--loose-top); }
 
-  .notice {
-    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 32px 56px; align-items: start;
-    max-width: 960px; margin: 8px auto 0;
-  }
-  .copy { min-width: 0; display: grid; gap: 14px; justify-items: start; }
-  .eyebrow { margin: 0; font: 500 12px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
   h1 {
-    margin: 0; font: 800 clamp(2.4rem, 1.6rem + 3.4vw, 4.1rem)/0.95 var(--display);
-    letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance;
+    margin: 0; padding-inline: 16px; max-width: 24ch;
+    font-weight: 300; font-size: clamp(1.75rem, 1.1rem + 2.4vw, 3rem); line-height: 1.1;
+    letter-spacing: -0.035em; text-align: center; text-wrap: balance;
   }
-  .lede { margin: 0; max-width: 52ch; color: var(--muted); text-wrap: pretty; }
-  .cta {
-    margin-top: 6px; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 20px;
-    border-radius: 8px; background: var(--ink); color: var(--bg); text-decoration: none;
-    font: 500 15px/1 var(--body); transition: background-color 160ms ease, color 160ms ease;
-  }
-  .cta:hover { background: var(--accent); color: var(--accent-ink); }
-  .cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
-  .cta svg { width: 16px; height: 16px; }
 
-  .board { margin: 0; border: 1px solid var(--rule); border-radius: 10px; padding: 6px 16px; font: 400 13px/1.4 var(--mono); }
-  .board-title { margin: 0; padding: 10px 0 8px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--rule); }
-  .board dl { margin: 0; }
-  .board div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
-  .board div:last-child { border-bottom: 0; }
-  .board dt { color: var(--muted); }
-  .board dd { margin: 0; min-width: 0; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 8px; }
-  .live { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
-
-  @media (max-width: 720px) {
-    .site { padding-block: 4px 40px; }
-    .notice { grid-template-columns: minmax(0, 1fr); gap: 28px; }
-    .tag { font-size: 9px; }
+  .sr-only {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip-path: inset(50%); white-space: nowrap;
   }
 </style>
 <!-- body -->
-<main class="site">
-  <div class="stage" id="stage" data-hairline="construction-404" role="img"
-       aria-label="A broken 404 built of blocks. Two tower cranes lift the missing blocks back into place while a crew works on the ground.">
-    <span class="tag name" aria-hidden="true">site 404</span>
-    <span class="tag read" id="read" aria-hidden="true">fixing 0/8</span>
-  </div>
-
-  <section class="notice">
-    <div class="copy">
-      <p class="eyebrow">Error 404 · Page not found</p>
-      <h1>This page is under construction</h1>
-      <p class="lede">The page you asked for is broken, and the crew is putting it back one block at a time. The home page is open while they work.</p>
-      <a class="cta" href="/">
-        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg>
-        Back to home
-      </a>
-    </div>
-    <section class="board" aria-labelledby="board-title">
-      <h2 class="board-title" id="board-title">Site board</h2>
-      <dl>
-      <div><dt>Site</dt><dd id="path">/</dd></div>
-      <div><dt>Status</dt><dd><span class="live" aria-hidden="true"></span><span id="status">fixing 0/8</span></dd></div>
-      <div><dt>Crew on site</dt><dd>7</dd></div>
-      <div><dt>Tower cranes</dt><dd>2</dd></div>
-      </dl>
-    </section>
-  </section>
+<main>
+  <div class="stage" id="stage" data-hairline="construction-404" role="img" tabindex="0"
+       aria-label="Page not found. A broken 404 built of blocks, with two tower cranes putting the missing blocks back. Click or tap a block to knock it out, or use the arrow keys to pick one and press Enter."></div>
+  <h1>This page is under construction</h1>
+  <p class="sr-only" id="live" aria-live="polite"></p>
 </main>
 
 <script id="hl-kernel">/*KERNEL*/</script>
@@ -127,16 +92,31 @@
     const params = new URLSearchParams(location.search);
     if (["light", "dark"].includes(params.get("theme"))) document.documentElement.dataset.theme = params.get("theme");
 
-    const path = location.pathname;
-    $("path").textContent = path && path !== "/" && path.length < 40 ? path : "/this-page";
-
     HL.inject(document);
-    const stage = $("stage");
-    const svg = HL.mk("svg", { viewBox: "0 0 800 450", "aria-hidden": "true" }, stage);
-    construction404(stage, svg, {
-      t: Number(params.get("t")) || 0,
-      freeze: params.has("freeze"),
-      onRead: (text) => { $("read").textContent = text; $("status").textContent = text; },
+    const stage = $("stage"), live = $("live");
+    const svg = HL.mk("svg", { "aria-hidden": "true" }, stage);
+
+    // A tall screen gets the 404 and its cranes up close; a wide one gets the whole site.
+    const frameFor = () => params.get("frame") || (innerWidth < innerHeight ? "core" : "full");
+    let site = null, frame = "";
+    function mount() {
+      if (site) site.destroy();
+      frame = frameFor();
+      site = construction404(stage, svg, {
+        frame,
+        t: Number(params.get("t")) || 0,
+        freeze: params.has("freeze"),
+        onAnnounce: (text) => { live.textContent = text; },
+      });
+      stage.dataset.frame = frame;
+      stage.style.setProperty("--aspect", site.aspect.toFixed(4));
+      if (params.has("test")) window.site = site;
+    }
+    mount();
+    let wait = 0;
+    addEventListener("resize", () => {
+      clearTimeout(wait);
+      wait = setTimeout(() => { if (frameFor() !== frame) mount(); }, 150);
     });
   })();
 </script>

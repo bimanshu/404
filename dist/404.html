@@ -4,12 +4,9 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <title>Page not found</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Geist:wght@300..400&display=swap">
 <style>
-  /* Layout: one centred column. The site takes as much of the screen as its shape allows, up to 80% of the
-     height; the one line sits under it. On a tall screen the site runs edge to edge. */
+  /* Layout: the site alone, centred in the viewport, as large as its shape allows up to 80% of the height.
+     On a tall screen it runs edge to edge. */
   :root {
     color-scheme: light;
     /* neutrals carry a slight cool bias (hue 260) so the greys read as one family */
@@ -22,7 +19,6 @@
     --block-top: oklch(0.94 0.004 260);   /* the blocks' tops, lit from above */
     --loose-face: oklch(0.78 0.008 260);  /* a block a press would knock out */
     --loose-top: oklch(0.86 0.006 260);
-    --font: "Geist", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -43,12 +39,11 @@
 
   * { box-sizing: border-box; }
   html { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
-  body { margin: 0; background: var(--bg); color: var(--ink); font-family: var(--font); }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: ui-sans-serif, system-ui, sans-serif; }
 
   main {
     min-height: 100vh; min-height: 100svh;
-    display: grid; align-content: center; justify-items: center;
-    row-gap: clamp(12px, 3svh, 32px);
+    display: grid; place-items: center;
     padding-block: 2svh;
   }
 
@@ -70,12 +65,6 @@
   .stage .loose .blk { fill: var(--loose-face); }
   .stage .loose .blk-top { fill: var(--loose-top); }
 
-  h1 {
-    margin: 0; padding-inline: 16px; max-width: 24ch;
-    font-weight: 300; font-size: clamp(1.75rem, 1.1rem + 2.4vw, 3rem); line-height: 1.1;
-    letter-spacing: -0.035em; text-align: center; text-wrap: balance;
-  }
-
   .sr-only {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;
     overflow: hidden; clip-path: inset(50%); white-space: nowrap;
@@ -86,7 +75,7 @@
 <main>
   <div class="stage" id="stage" data-hairline="construction-404" role="img" tabindex="0"
        aria-label="Page not found. A broken 404 built of blocks, with two tower cranes putting the missing blocks back. Click or tap a block to knock it out, or use the arrow keys to pick one and press Enter."></div>
-  <h1>This page is under construction</h1>
+  <h1 class="sr-only">This page is under construction</h1>
   <p class="sr-only" id="live" aria-live="polite"></p>
 </main>
 

@@ -1,8 +1,9 @@
 #!/usr/bin/env node
 /**
  * Builds the 404 page: `node scripts/build.mjs` writes dist/404.html, one
- * self-contained file with the Hairline kernel and the scene inlined.
- * `--fragment <out>` also writes the page without its document skeleton.
+ * self-contained file with the Hairline kernel and the scene's parts
+ * (src/scene) inlined. `--out <file>` writes it elsewhere; `--fragment <file>`
+ * also writes the page without its document skeleton.
  */
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
@@ -12,12 +13,17 @@ const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const read = (p) => readFileSync(resolve(root, p), "utf8").replace(/\r\n/g, "\n").trim();
 
 // Functions as replacements, so a `$&` in the sources is pasted as it is.
+// The scene, part by part: each part is a function the next ones and main.js call.
+const PARTS = ["core", "ground", "blocks", "cranes", "people", "main"];
+const scene = PARTS.map((p) => read(`src/scene/${p}.js`)).join("\n\n");
 const page = read("src/page.html")
   .replace("/*KERNEL*/", () => `\n${read("vendor/hairline-kernel.js")}\n`)
-  .replace("/*SCENE*/", () => `\n${read("src/construction-404.js")}\n`);
+  .replace("/*SCENE*/", () => `\n${scene}\n`);
 const [head, body] = page.split("<!-- body -->");
 
-const out = resolve(root, "dist/404.html");
+// --out <file> writes the page somewhere else (each worker its own copy); dist/404.html by default.
+const o = process.argv.indexOf("--out");
+const out = resolve(o > 0 && process.argv[o + 1] ? process.argv[o + 1] : resolve(root, "dist/404.html"));
 mkdirSync(dirname(out), { recursive: true });
 writeFileSync(out, `<!doctype html>
 <html lang="en">

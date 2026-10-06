@@ -14,6 +14,11 @@
     --block-top: oklch(0.94 0.004 260);   /* the blocks' tops, lit from above */
     --loose-face: oklch(0.78 0.008 260);  /* a block a press would knock out */
     --loose-top: oklch(0.86 0.006 260);
+    /* surface tones for shading, from in shade (1) to lit (6); the scene picks them by a face's normal */
+    --tone-1: oklch(0.76 0.008 260); --tone-2: oklch(0.82 0.007 260); --tone-3: oklch(0.87 0.006 260);
+    --tone-4: oklch(0.91 0.005 260); --tone-5: oklch(0.945 0.004 260); --tone-6: oklch(0.975 0.003 255);
+    --hivis: oklch(0.97 0.004 255);       /* reflective vests and hard hats: the brightest cloth */
+    --shadow: oklch(0.45 0.01 260);       /* contact shadows, faded by the scene */
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -22,6 +27,9 @@
       --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
       --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260);
       --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260);
+      --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
+      --tone-4: oklch(0.27 0.007 260); --tone-5: oklch(0.32 0.008 260); --tone-6: oklch(0.38 0.009 260);
+      --hivis: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
     }
   }
   :root[data-theme="dark"] {
@@ -30,6 +38,9 @@
     --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
     --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260);
     --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260);
+    --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
+    --tone-4: oklch(0.27 0.007 260); --tone-5: oklch(0.32 0.008 260); --tone-6: oklch(0.38 0.009 260);
+    --hivis: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
   }
 
   * { box-sizing: border-box; }
@@ -59,6 +70,10 @@
   .stage .blk-top { fill: var(--block-top); }
   .stage .loose .blk { fill: var(--loose-face); }
   .stage .loose .blk-top { fill: var(--loose-top); }
+  .stage .t1 { fill: var(--tone-1); } .stage .t2 { fill: var(--tone-2); } .stage .t3 { fill: var(--tone-3); }
+  .stage .t4 { fill: var(--tone-4); } .stage .t5 { fill: var(--tone-5); } .stage .t6 { fill: var(--tone-6); }
+  .stage .hv { fill: var(--hivis); }
+  .stage .shade-stop { stop-color: var(--shadow); }
 
   .sr-only {
     position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0; border: 0;

@@ -1,4 +1,10 @@
 {
+  "name": "404",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs"
+  },
   "dependencies": {
     "@lucasmarkes/hairline": "^0.3.0"
   }

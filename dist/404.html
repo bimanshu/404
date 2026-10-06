@@ -1,0 +1,1492 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Construction 404</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Stencil+Display:wght@800&family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500&display=swap">
+<style>
+  /* Layout: the site itself is the hero, full width; under it the notice and the site board sit side by side, stacked on a phone. */
+  :root {
+    color-scheme: light;
+    --bg: #ffffff;          /* the same as the drawing's plates, so the site sits on the page */
+    --ink: #1d1e22;
+    --muted: #686a73;
+    --rule: #e2e2e7;
+    --accent: #9a6400;      /* safety amber, darkened for white */
+    --accent-ink: #ffffff;
+    --line-edge: #8e8f98;   /* the drawing's silhouettes */
+    --line-mid: #b6b7be;    /* its other strokes */
+    --display: "Big Shoulders Stencil Display", "Arial Narrow", "Roboto Condensed", sans-serif;
+    --body: "IBM Plex Sans", ui-sans-serif, system-ui, -apple-system, "Segoe UI", sans-serif;
+    --mono: "IBM Plex Mono", ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      color-scheme: dark;
+      --bg: #08090a; --ink: #d4d9e2; --muted: #8a8c96; --rule: #26272c; --accent: #f2b33d; --accent-ink: #08090a;
+      --line-edge: #62646c; --line-mid: #404148;
+    }
+  }
+  :root[data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #08090a; --ink: #d4d9e2; --muted: #8a8c96; --rule: #26272c; --accent: #f2b33d; --accent-ink: #08090a;
+    --line-edge: #62646c; --line-mid: #404148;
+  }
+
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; background: var(--bg); color: var(--ink);
+    font: 400 16px/1.6 var(--body); -webkit-font-smoothing: antialiased;
+  }
+  .site { max-width: 1120px; margin: 0 auto; padding-inline: 16px; padding-block: 12px 56px; }
+
+  /* The site keeps its 16:9 frame, and gives up width on a short screen so the notice still shows under it. */
+  .stage {
+    width: min(100%, max(560px, (100vh - 380px) * 16 / 9));
+    width: min(100%, max(560px, (100svh - 380px) * 16 / 9));
+    max-width: 100%; aspect-ratio: 800 / 450; margin-inline: auto;
+    /* the drawing takes its five strokes from the page's tokens, so its plates match the page */
+    --hairline-plate: var(--bg); --hairline-hi: var(--ink); --hairline-edge: var(--line-edge);
+    --hairline-mid: var(--line-mid); --hairline-lo: var(--rule);
+  }
+  .tag {
+    position: absolute; top: 2.5%; z-index: 1; pointer-events: none;
+    font: 500 11px/1 var(--mono); letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted);
+  }
+  .tag.name { left: 1.5%; }
+  .tag.read { right: 1.5%; color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .notice {
+    display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 320px); gap: 32px 56px; align-items: start;
+    max-width: 960px; margin: 8px auto 0;
+  }
+  .copy { min-width: 0; display: grid; gap: 14px; justify-items: start; }
+  .eyebrow { margin: 0; font: 500 12px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); }
+  h1 {
+    margin: 0; font: 800 clamp(2.4rem, 1.6rem + 3.4vw, 4.1rem)/0.95 var(--display);
+    letter-spacing: 0.01em; text-transform: uppercase; text-wrap: balance;
+  }
+  .lede { margin: 0; max-width: 52ch; color: var(--muted); text-wrap: pretty; }
+  .cta {
+    margin-top: 6px; display: inline-flex; align-items: center; gap: 10px; min-height: 44px; padding: 0 20px;
+    border-radius: 8px; background: var(--ink); color: var(--bg); text-decoration: none;
+    font: 500 15px/1 var(--body); transition: background-color 160ms ease, color 160ms ease;
+  }
+  .cta:hover { background: var(--accent); color: var(--accent-ink); }
+  .cta:focus-visible { outline: 2px solid var(--accent); outline-offset: 3px; }
+  .cta svg { width: 16px; height: 16px; }
+
+  .board { margin: 0; border: 1px solid var(--rule); border-radius: 10px; padding: 6px 16px; font: 400 13px/1.4 var(--mono); }
+  .board-title { margin: 0; padding: 10px 0 8px; font: 500 11px/1 var(--mono); letter-spacing: 0.12em; text-transform: uppercase; color: var(--muted); border-bottom: 1px solid var(--rule); }
+  .board dl { margin: 0; }
+  .board div { display: flex; justify-content: space-between; gap: 16px; padding: 10px 0; border-bottom: 1px solid var(--rule); }
+  .board div:last-child { border-bottom: 0; }
+  .board dt { color: var(--muted); }
+  .board dd { margin: 0; min-width: 0; text-align: right; overflow-wrap: anywhere; font-variant-numeric: tabular-nums; display: flex; align-items: center; gap: 8px; }
+  .live { width: 7px; height: 7px; border-radius: 50%; background: var(--accent); flex: none; }
+
+  @media (max-width: 720px) {
+    .site { padding-block: 4px 40px; }
+    .notice { grid-template-columns: minmax(0, 1fr); gap: 28px; }
+    .tag { font-size: 9px; }
+  }
+</style>
+</head>
+<body>
+<main class="site">
+  <div class="stage" id="stage" data-hairline="construction-404" role="img"
+       aria-label="A broken 404 built of blocks. Two tower cranes lift the missing blocks back into place while a crew works on the ground.">
+    <span class="tag name" aria-hidden="true">site 404</span>
+    <span class="tag read" id="read" aria-hidden="true">fixing 0/8</span>
+  </div>
+
+  <section class="notice">
+    <div class="copy">
+      <p class="eyebrow">Error 404 · Page not found</p>
+      <h1>This page is under construction</h1>
+      <p class="lede">The page you asked for is broken, and the crew is putting it back one block at a time. The home page is open while they work.</p>
+      <a class="cta" href="/">
+        <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M10 3.5 5.5 8l4.5 4.5"/></svg>
+        Back to home
+      </a>
+    </div>
+    <section class="board" aria-labelledby="board-title">
+      <h2 class="board-title" id="board-title">Site board</h2>
+      <dl>
+      <div><dt>Site</dt><dd id="path">/</dd></div>
+      <div><dt>Status</dt><dd><span class="live" aria-hidden="true"></span><span id="status">fixing 0/8</span></dd></div>
+      <div><dt>Crew on site</dt><dd>7</dd></div>
+      <div><dt>Tower cranes</dt><dd>2</dd></div>
+      </dl>
+    </section>
+  </section>
+</main>
+
+<script id="hl-kernel">
+/* hairline kernel sha256:8e2abcbdf63c7755195ee942c39e9c8ea6a539d1147e986dd1c153559121f075 */
+/*
+ * HL: everything a figure may call. Read this index; the code under it is the
+ * package's src/core, unchanged, and a figure should not need to read it.
+ *
+ * Every figure is drawn in a 400 × 320 viewBox. World space is x/y on the
+ * ground and z up. Plates are filled with the ground colour and painted back
+ * to front, so a nearer one covers a farther one: append in that order. At
+ * the default camera, Cam(45, 0.5, S), +x runs down to the right and +y down
+ * to the left, so the corner with the largest x and y is nearest the viewer:
+ * append by ascending x + y, from the far corner (smallest x and y) to it.
+ *
+ * Camera
+ *   Cam(azDeg, k, S)                       a camera: azimuth in degrees, k = sin(elevation) (0.5 is the 2:1 view), S = scale
+ *   fit(C, points, cx, cy)                 centres the box of [x, y, z] points on (cx, cy); call it once, before proj
+ *                                          it only centres, it never scales: choose S by trying values, with the most extreme pose in points.
+ *                                          The six figures use S 1.42 to 2.12; the boxes they fit come out 230 to 310 wide and 180 to 245 tall
+ *   proj(C)                                returns P(x, y, z), which gives [sx, sy]
+ *   unproj(C, sx, sy, z)                   the world [x, y] under a screen point, on the plane at height z
+ *   facing(C)                              returns front(sample): whether a ring sample faces the camera
+ * Rounded solids
+ *   rrect(u0, v0, u1, v1, r, n)            a rounded rectangle, as a ring of samples {u, v, nu, nv}
+ *   circ(R, n)                             a circle, as a ring
+ *   rings(x0, y0, x1, y1, r, b)            [ring, inner]: a rounded footprint and its crease ring, inset by b
+ *                                          r, the corner radius, is cut to half the shorter side. b, the crease's inset in world units
+ *                                          (0.6 to 2.2 in the figures), must stay under half the shorter side or the crease turns inside out
+ *   prism(P, front, ring, inner, z0, z1)   {sil, crease}: a solid standing from z0 to z1, as two path strings
+ *   ringAt(P, ring, z)                     the ring's points, projected at height z
+ *   run(ring, keep)                        the one cyclic run of samples that pass keep
+ *   hull(points)                           the convex hull of screen points
+ *   extremes(P, ring)                      [left, right, nearest] samples: where dashed drops fall from
+ *   fillet(points, radii, n)               rounds every vertex of a closed polygon; returns the new points
+ *                                          radii is an array, one radius per vertex, each cut to half its shorter edge; a single number gives NaN.
+ *                                          n is the steps round each corner, default 4: each vertex becomes n + 1 points
+ *   ghost(P, front, ring, z0, depth)       a reflection's path {d, y0, y1}; reflect() draws it for you
+ * Paths and numbers
+ *   poly(points)                           a closed path string
+ *   open(points)                           an open polyline string
+ *   seg(a, b)                              one segment between two screen points [sx, sy], as its own subpath; project world points with P first
+ *   clamp(v, a, b)
+ *   lerp(a, b, t)
+ *   rad(deg)
+ *   r2(n)                                  two decimals
+ * The continuous clock: one spring per moving number
+ *   spring(x, opts)                        at rest on x; write .t to retarget; opts {k, c, m, eps}, default k 100, c 18, m 1
+ *   stepS(sp, dt)                          advances by dt seconds; returns whether it is still moving
+ * The discrete clock: a 700ms tween on (.32, .72, 0, 1)
+ *   tween(v, dur)                          at rest on v; dur defaults to 700 (ms)
+ *   tset(tw, to, now, delay)               retargets from where it is, after delay ms: the stagger
+ *                                          the same target again does nothing, so calling it on every pointer move is safe
+ *   tval(tw, now)                          its value at now
+ *   tdone(tw, now)                         whether it has landed
+ *   bezier(x1, y1, x2, y2)                 a CSS cubic-bezier, as a function of progress
+ *   EASE_LIFT                              the lift curve itself
+ *   reducedMotion()                        true when the reader asked for less motion; springs and tweens already land at once
+ *   setReducedMotion(on)                   the loop's business, not a figure's
+ * Drawing
+ *   mk(tag, attrs, parent)                 one svg element: the only way a figure makes a node
+ *   solid(parent)                          {g, sil, cr}: a group holding a silhouette path and a crease path
+ *   put(solid, paths)                      writes prism()'s {sil, crease} into solid()'s {sil, cr}: sil into sil, crease into cr
+ *   flatDot(parent, C, r, cls)             a dot lying on the ground plane; cls is "dot", "dot m" or "dot off"
+ *   place(el, point)                       moves a dot or a circle to [sx, sy]
+ *   reflect(svg, parent, P, front, ring, z0, depth)   a fading mirror under a solid
+ *   fade(svg, y0, y1, a0)                  a vertical fade, as a mask; returns the value for a mask attribute
+ * Life
+ *   register(stage, tick)                  joins the one frame loop; tick(dt in seconds, now in ms) returns true to ask for another frame; gives {wake, unregister}
+ *   pointer(stage, handlers)               {move(point), down(point), leave()}, points in viewBox units; returns its disposer
+ *   disposer()                             {add, on, dispose}: collects tear-down, so destroy is bag.dispose
+ * The bench's business, not a figure's
+ *   css(lightDark)
+ *   inject(root)
+ *
+ * Classes, on path, polygon, ellipse and line. They are the whole palette; a
+ * figure sets no colour, width or fill of its own.
+ *     (none)   filled with the ground colour, medium stroke
+ *     sil      the silhouette's stroke        hi    the bright stroke: the only highlight
+ *     lo       the dim stroke                 nf    no fill        fo   fill only, no stroke
+ *     dash     a dashed guide
+ *     dot      a bright dot                   dot m   a medium dot     dot off   a dim dot
+ */
+var HL = (() => {
+  var __defProp = Object.defineProperty;
+  var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
+  var __getOwnPropNames = Object.getOwnPropertyNames;
+  var __hasOwnProp = Object.prototype.hasOwnProperty;
+  var __export = (target, all) => {
+    for (var name in all)
+      __defProp(target, name, { get: all[name], enumerable: true });
+  };
+  var __copyProps = (to, from, except, desc) => {
+    if (from && typeof from === "object" || typeof from === "function") {
+      for (let key of __getOwnPropNames(from))
+        if (!__hasOwnProp.call(to, key) && key !== except)
+          __defProp(to, key, { get: () => from[key], enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable });
+    }
+    return to;
+  };
+  var __toCommonJS = (mod) => __copyProps(__defProp({}, "__esModule", { value: true }), mod);
+
+  // packages/hairline/src/core/kernel.ts
+  var kernel_exports = {};
+  __export(kernel_exports, {
+    Cam: () => Cam,
+    EASE_LIFT: () => EASE_LIFT,
+    bezier: () => bezier,
+    circ: () => circ,
+    clamp: () => clamp,
+    css: () => css,
+    disposer: () => disposer,
+    extremes: () => extremes,
+    facing: () => facing,
+    fade: () => fade,
+    fillet: () => fillet,
+    fit: () => fit,
+    flatDot: () => flatDot,
+    ghost: () => ghost,
+    hull: () => hull,
+    inject: () => inject,
+    lerp: () => lerp,
+    mk: () => mk,
+    open: () => open,
+    place: () => place,
+    pointer: () => pointer,
+    poly: () => poly,
+    prism: () => prism,
+    proj: () => proj,
+    put: () => put,
+    r2: () => r2,
+    rad: () => rad,
+    reducedMotion: () => reducedMotion,
+    reflect: () => reflect,
+    register: () => register,
+    ringAt: () => ringAt,
+    rings: () => rings,
+    rrect: () => rrect,
+    run: () => run,
+    seg: () => seg,
+    setReducedMotion: () => setReducedMotion,
+    solid: () => solid,
+    spring: () => spring,
+    stepS: () => stepS,
+    tdone: () => tdone,
+    tset: () => tset,
+    tval: () => tval,
+    tween: () => tween,
+    unproj: () => unproj
+  });
+
+  // packages/hairline/src/core/iso.ts
+  var clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+  var lerp = (a, b, t) => a + (b - a) * t;
+  var rad = (d) => d * Math.PI / 180;
+  var r2 = (n) => Math.round(n * 100) / 100;
+  var poly = (pts) => "M" + pts.map((p) => r2(p[0]) + " " + r2(p[1])).join("L") + "Z";
+  var seg = (a, b) => `M${r2(a[0])} ${r2(a[1])}L${r2(b[0])} ${r2(b[1])}`;
+  var open = (pts) => pts.length < 2 ? "" : "M" + pts.map((p) => r2(p[0]) + " " + r2(p[1])).join("L");
+  var Cam = (azDeg, k, S) => ({ az: rad(azDeg), k, S, ox: 0, oy: 0 });
+  function proj(C) {
+    const c = Math.cos(C.az), s = Math.sin(C.az), zf = Math.sqrt(1 - C.k * C.k);
+    return (x, y, z) => {
+      const X = x * c - y * s, Y = x * s + y * c;
+      return [C.ox + C.S * X, C.oy + C.S * (Y * C.k - z * zf)];
+    };
+  }
+  function unproj(C, sx, sy, z) {
+    const c = Math.cos(C.az), s = Math.sin(C.az), zf = Math.sqrt(1 - C.k * C.k);
+    const X = (sx - C.ox) / C.S, Y = ((sy - C.oy) / C.S + z * zf) / C.k;
+    return [X * c + Y * s, -X * s + Y * c];
+  }
+  function fit(C, pts, cx, cy) {
+    C.ox = 0;
+    C.oy = 0;
+    const P = proj(C);
+    let a = 1e9, b = -1e9, c = 1e9, d = -1e9;
+    for (const p of pts) {
+      const q = P(p[0], p[1], p[2]);
+      a = Math.min(a, q[0]);
+      b = Math.max(b, q[0]);
+      c = Math.min(c, q[1]);
+      d = Math.max(d, q[1]);
+    }
+    C.ox = cx - (a + b) / 2;
+    C.oy = cy - (c + d) / 2;
+  }
+  function rrect(u0, v0, u1, v1, r, n = 4) {
+    r = Math.max(0, Math.min(r, (u1 - u0) / 2, (v1 - v0) / 2));
+    const out = [];
+    for (const [cu, cv, a0] of [[u1 - r, v1 - r, 0], [u0 + r, v1 - r, 90], [u0 + r, v0 + r, 180], [u1 - r, v0 + r, 270]])
+      for (let k = 0; k <= n; k++) {
+        const a = rad(a0 + 90 * k / n), ca = Math.cos(a), sa = Math.sin(a);
+        out.push({ u: cu + r * ca, v: cv + r * sa, nu: ca, nv: sa });
+      }
+    return out;
+  }
+  function circ(R, n = 96) {
+    const out = [];
+    for (let k = 0; k < n; k++) {
+      const a = k / n * Math.PI * 2, ca = Math.cos(a), sa = Math.sin(a);
+      out.push({ u: R * ca, v: R * sa, nu: ca, nv: sa });
+    }
+    return out;
+  }
+  function hull(input) {
+    const pts = input.slice().sort((a, b) => a[0] - b[0] || a[1] - b[1]);
+    const x = (o, a, b) => (a[0] - o[0]) * (b[1] - o[1]) - (a[1] - o[1]) * (b[0] - o[0]);
+    const lo = [], up = [];
+    for (const p of pts) {
+      while (lo.length > 1 && x(lo[lo.length - 2], lo[lo.length - 1], p) <= 0) lo.pop();
+      lo.push(p);
+    }
+    for (let i = pts.length - 1; i >= 0; i--) {
+      const p = pts[i];
+      while (up.length > 1 && x(up[up.length - 2], up[up.length - 1], p) <= 0) up.pop();
+      up.push(p);
+    }
+    lo.pop();
+    up.pop();
+    return lo.concat(up);
+  }
+  var ringAt = (P, ring, z) => ring.map((q) => P(q.u, q.v, z));
+  var facing = (C) => {
+    const s = Math.sin(C.az), c = Math.cos(C.az);
+    return (q) => q.nu * s + q.nv * c >= -1e-6;
+  };
+  function run(ring, keep) {
+    const n = ring.length;
+    let s = -1;
+    for (let i = 0; i < n; i++) if (keep(ring[i]) && !keep(ring[(i + n - 1) % n])) {
+      s = i;
+      break;
+    }
+    if (s < 0) return keep(ring[0]) ? ring.slice() : [];
+    const out = [];
+    for (let k = 0; k < n && keep(ring[(s + k) % n]); k++) out.push(ring[(s + k) % n]);
+    return out;
+  }
+  function prism(P, front, ring, inner, z0, z1) {
+    return {
+      sil: poly(hull(ringAt(P, ring, z1).concat(ringAt(P, ring, z0)))),
+      crease: inner ? open(ringAt(P, run(inner, front), z1)) : ""
+    };
+  }
+  var rings = (x0, y0, x1, y1, r, b) => [
+    rrect(x0, y0, x1, y1, r),
+    rrect(x0 + b, y0 + b, x1 - b, y1 - b, Math.max(0.3, r - b))
+  ];
+  function extremes(P, ring) {
+    const pr = ring.map((q) => P(q.u, q.v, 0));
+    let a = 0, b = 0, c = 0;
+    pr.forEach((p, k) => {
+      if (p[0] < pr[a][0]) a = k;
+      if (p[0] > pr[b][0]) b = k;
+      if (p[1] > pr[c][1]) c = k;
+    });
+    return [ring[a], ring[b], ring[c]];
+  }
+  function fillet(pts, rs, n = 4) {
+    const m = pts.length, out = [];
+    for (let i = 0; i < m; i++) {
+      const a = pts[(i + m - 1) % m], p = pts[i], b = pts[(i + 1) % m];
+      const la = Math.hypot(a[0] - p[0], a[1] - p[1]), lb = Math.hypot(b[0] - p[0], b[1] - p[1]);
+      const t = Math.min(rs[i], la / 2, lb / 2);
+      const p1 = [p[0] + (a[0] - p[0]) / la * t, p[1] + (a[1] - p[1]) / la * t];
+      const p2 = [p[0] + (b[0] - p[0]) / lb * t, p[1] + (b[1] - p[1]) / lb * t];
+      for (let k = 0; k <= n; k++) {
+        const s = k / n, w = 1 - s;
+        out.push([w * w * p1[0] + 2 * w * s * p[0] + s * s * p2[0], w * w * p1[1] + 2 * w * s * p[1] + s * s * p2[1]]);
+      }
+    }
+    return out;
+  }
+  function ghost(P, front, ring, z0, depth) {
+    const f = run(ring, front), lowP = ringAt(P, f, z0 - depth);
+    return {
+      d: open(lowP) + [f[0], f[f.length - 1]].map((q) => seg(P(q.u, q.v, z0), P(q.u, q.v, z0 - depth))).join(""),
+      y0: Math.min(...ringAt(P, f, z0).map((p) => p[1])),
+      y1: Math.max(...lowP.map((p) => p[1])) + 2
+    };
+  }
+
+  // packages/hairline/src/core/motion.ts
+  var reduced = false;
+  var setReducedMotion = (on) => {
+    reduced = on;
+  };
+  var reducedMotion = () => reduced;
+  function spring(x, o = {}) {
+    return { x, v: 0, t: x, k: o.k ?? 100, c: o.c ?? 18, m: o.m ?? 1, eps: o.eps ?? 0.01 };
+  }
+  function stepS(sp, dt) {
+    if (reduced) {
+      sp.x = sp.t;
+      sp.v = 0;
+      return false;
+    }
+    const n = Math.max(1, Math.ceil(dt * 240)), h = dt / n;
+    for (let i = 0; i < n; i++) {
+      const a = (-sp.k * (sp.x - sp.t) - sp.c * sp.v) / sp.m;
+      sp.v += a * h;
+      sp.x += sp.v * h;
+    }
+    if (Math.abs(sp.x - sp.t) < sp.eps && Math.abs(sp.v) < sp.eps * 10) {
+      sp.x = sp.t;
+      sp.v = 0;
+      return false;
+    }
+    return true;
+  }
+  function bezier(x1, y1, x2, y2) {
+    const cx = 3 * x1, bx = 3 * (x2 - x1) - cx, ax = 1 - cx - bx;
+    const cy = 3 * y1, by = 3 * (y2 - y1) - cy, ay = 1 - cy - by;
+    const X = (u) => ((ax * u + bx) * u + cx) * u;
+    const Y = (u) => ((ay * u + by) * u + cy) * u;
+    const dX = (u) => (3 * ax * u + 2 * bx) * u + cx;
+    return (t) => {
+      if (t <= 0) return 0;
+      if (t >= 1) return 1;
+      let u = t;
+      for (let i = 0; i < 8; i++) {
+        const e = X(u) - t;
+        if (Math.abs(e) < 1e-5) break;
+        const d = dX(u);
+        if (Math.abs(d) < 1e-6) break;
+        u -= e / d;
+      }
+      if (!(u >= 0 && u <= 1) || Math.abs(X(u) - t) > 1e-4) {
+        let lo = 0, hi = 1;
+        u = t;
+        for (let i = 0; i < 24; i++) {
+          if (X(u) < t) lo = u;
+          else hi = u;
+          u = (lo + hi) / 2;
+        }
+      }
+      return Y(u);
+    };
+  }
+  var EASE_LIFT = bezier(0.32, 0.72, 0, 1);
+  var tween = (v, dur = 700) => ({ from: v, to: v, t0: -1e9, dur });
+  var tval = (tw, now) => {
+    const p = clamp((now - tw.t0) / tw.dur, 0, 1);
+    return tw.from + (tw.to - tw.from) * (reduced ? 1 : EASE_LIFT(p));
+  };
+  var tset = (tw, to, now, delay) => {
+    if (tw.to === to) return;
+    tw.from = tval(tw, now);
+    tw.to = to;
+    tw.t0 = now + delay;
+  };
+  var tdone = (tw, now) => reduced || now >= tw.t0 + tw.dur;
+
+  // packages/hairline/src/core/stage.ts
+  var NS = "http://www.w3.org/2000/svg";
+  function mk(tag, attrs, parent) {
+    const e = document.createElementNS(NS, tag);
+    if (attrs) for (const k in attrs) e.setAttribute(k, String(attrs[k]));
+    if (parent) parent.appendChild(e);
+    return e;
+  }
+  function solid(parent) {
+    const g = mk("g", {}, parent);
+    return { g, sil: mk("path", { class: "sil" }, g), cr: mk("path", { class: "nf lo" }, g) };
+  }
+  var put = (el, s) => {
+    el.sil.setAttribute("d", s.sil);
+    el.cr.setAttribute("d", s.crease);
+  };
+  var flatDot = (parent, C, r, cls) => mk("ellipse", { rx: r2(r * C.S), ry: r2(r * C.S * C.k), class: cls }, parent);
+  var place = (el, q) => {
+    el.setAttribute("cx", String(r2(q[0])));
+    el.setAttribute("cy", String(r2(q[1])));
+  };
+  var fid = 0;
+  function fade(svg, y0, y1, a0 = 0.7) {
+    const id = "hl-fd" + ++fid, defs = mk("defs", {}, svg);
+    const lg = mk("linearGradient", { id: id + "g", gradientUnits: "userSpaceOnUse", x1: 0, y1: r2(y0), x2: 0, y2: r2(y1) }, defs);
+    mk("stop", { offset: 0, "stop-color": "#fff", "stop-opacity": a0 }, lg);
+    mk("stop", { offset: 1, "stop-color": "#fff", "stop-opacity": 0 }, lg);
+    const m = mk("mask", { id, maskUnits: "userSpaceOnUse", x: 0, y: 0, width: 400, height: 320 }, defs);
+    mk("rect", { x: 0, y: 0, width: 400, height: 320, fill: `url(#${id}g)` }, m);
+    return `url(#${id})`;
+  }
+  function reflect(svg, parent, P, front, ring, z0, depth) {
+    const r = ghost(P, front, ring, z0, depth);
+    const gh = mk("g", { class: "ghost", mask: fade(svg, r.y0, r.y1) }, parent);
+    mk("path", { d: r.d }, gh);
+  }
+  var boards = [];
+  var byStage = /* @__PURE__ */ new Map();
+  var raf = 0;
+  var last = 0;
+  var io = null;
+  var rm = null;
+  function frame(now) {
+    const dt = Math.min(0.05, Math.max(0, (now - last) / 1e3));
+    last = now;
+    let any = false;
+    for (const b of boards.slice()) if (b.vis && b.awake) {
+      b.awake = !!b.tick(dt, now);
+      any = any || b.awake;
+    }
+    raf = any ? requestAnimationFrame(frame) : 0;
+  }
+  function wake(b) {
+    b.awake = true;
+    if (!raf) {
+      last = performance.now();
+      raf = requestAnimationFrame(frame);
+    }
+  }
+  var onMotion = () => {
+    setReducedMotion(!!rm?.matches);
+    boards.forEach(wake);
+  };
+  function start() {
+    if (io) return;
+    io = new IntersectionObserver((es) => {
+      for (const e of es) {
+        const b = byStage.get(e.target);
+        if (!b) continue;
+        b.vis = e.isIntersecting;
+        if (b.vis) wake(b);
+      }
+    }, { rootMargin: "80px" });
+    rm = matchMedia("(prefers-reduced-motion: reduce)");
+    setReducedMotion(rm.matches);
+    rm.addEventListener("change", onMotion);
+  }
+  function stop() {
+    if (raf) cancelAnimationFrame(raf);
+    raf = 0;
+    io?.disconnect();
+    io = null;
+    rm?.removeEventListener("change", onMotion);
+    rm = null;
+  }
+  function register(stage, tick) {
+    start();
+    const b = { stage, tick, vis: false, awake: true };
+    boards.push(b);
+    byStage.set(stage, b);
+    io.observe(stage);
+    tick(0, performance.now());
+    let gone = false;
+    return {
+      wake: () => {
+        if (!gone) wake(b);
+      },
+      unregister: () => {
+        if (gone) return;
+        gone = true;
+        boards = boards.filter((x) => x !== b);
+        if (byStage.get(stage) === b) {
+          byStage.delete(stage);
+          io?.unobserve(stage);
+        }
+        if (!boards.length) stop();
+      }
+    };
+  }
+  function pointer(stage, on) {
+    let tm = 0;
+    const pt = (e) => {
+      const r = stage.getBoundingClientRect();
+      return [(e.clientX - r.left) / r.width * 400, (e.clientY - r.top) / r.height * 320];
+    };
+    const move = (e) => {
+      clearTimeout(tm);
+      on.move(pt(e), e);
+    };
+    const down = (e) => {
+      clearTimeout(tm);
+      if (e.pointerType !== "mouse") stage.releasePointerCapture?.(e.pointerId);
+      if (on.down) on.down(pt(e), e);
+      else on.move(pt(e), e);
+    };
+    const leave = (e) => {
+      clearTimeout(tm);
+      tm = window.setTimeout(() => on.leave(e), e.pointerType === "mouse" ? 0 : 1400);
+    };
+    stage.addEventListener("pointermove", move);
+    stage.addEventListener("pointerdown", down);
+    stage.addEventListener("pointerleave", leave);
+    return () => {
+      clearTimeout(tm);
+      stage.removeEventListener("pointermove", move);
+      stage.removeEventListener("pointerdown", down);
+      stage.removeEventListener("pointerleave", leave);
+    };
+  }
+  function disposer() {
+    let fns = [];
+    return {
+      add: (fn) => {
+        fns.push(fn);
+      },
+      on: (target, type, fn, opts) => {
+        const h = fn;
+        target.addEventListener(type, h, opts);
+        fns.push(() => target.removeEventListener(type, h, opts));
+      },
+      dispose: () => {
+        const run2 = fns;
+        fns = [];
+        for (let i = run2.length - 1; i >= 0; i--) run2[i]();
+      }
+    };
+  }
+
+  // packages/hairline/src/core/styles.ts
+  var LIGHT = { plate: "#ffffff", hi: "#232327", edge: "#a4a4ac", mid: "#c3c3c9", lo: "#e0e0e4" };
+  var DARK = { plate: "#08090a", hi: "#d0d6e0", edge: "#5b5d64", mid: "#3e3e44", lo: "#29292d" };
+  var KEYS = ["plate", "hi", "edge", "mid", "lo"];
+  var vars = (p) => KEYS.map((k) => `--hl-${k}:var(--hairline-${k},${p[k]});`).join("");
+  var EASE = "cubic-bezier(0.5,0,0.1,1)";
+  var SVG = ":where([data-hairline]>svg)";
+  function css(lightDark) {
+    const both = Object.fromEntries(KEYS.map((k) => [k, `light-dark(${LIGHT[k]},${DARK[k]})`]));
+    return [
+      // the box, and the palette: light unless something below says otherwise
+      `:where([data-hairline]){display:block;position:relative;aspect-ratio:5/4;touch-action:pan-y;user-select:none;-webkit-user-select:none;--hl-sw:var(--hairline-stroke,0.9);${vars(LIGHT)}}`,
+      // the page's color-scheme
+      lightDark ? `:where([data-hairline]){${vars(both)}}` : "",
+      // an ancestor that says dark
+      `:where(.dark,[data-theme="dark"]) :where([data-hairline]){${vars(DARK)}}`,
+      // the figure's own theme option
+      `:where([data-hairline][data-hairline-theme="light"]){${vars(LIGHT)}}`,
+      `:where([data-hairline][data-hairline-theme="dark"]){${vars(DARK)}}`,
+      `:where([data-hairline]:focus-visible){outline:1.5px solid var(--hl-hi);outline-offset:2px}`,
+      `${SVG}{position:absolute;inset:0;width:100%;height:100%;display:block}`,
+      // Riffle's live region: read, not seen
+      `:where([data-hairline]>[data-hairline-live]){position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}`,
+      // the drawing: plates are filled with the plate colour and painted back to front
+      `${SVG} :where(path,polygon,ellipse,line){fill:var(--hl-plate);stroke:var(--hl-mid);stroke-width:var(--hl-sw);vector-effect:non-scaling-stroke;stroke-linejoin:round;stroke-linecap:round;transition:stroke 260ms ${EASE}}`,
+      `${SVG} :where(.nf){fill:none}`,
+      `${SVG} :where(.fo){stroke:none}`,
+      `${SVG} :where(.sil){stroke:var(--hl-edge)}`,
+      `${SVG} :where(.hi){stroke:var(--hl-hi)}`,
+      `${SVG} :where(.lo){stroke:var(--hl-lo)}`,
+      `${SVG} :where(.dash){stroke-dasharray:1 3}`,
+      `${SVG} :where(.dot){stroke:none;fill:var(--hl-hi);transition:fill 260ms ${EASE}}`,
+      `${SVG} :where(.dot.m){fill:var(--hl-edge)}`,
+      `${SVG} :where(.dot.off){fill:var(--hl-lo)}`,
+      `${SVG} :where(.ghost path){fill:none;stroke:var(--hl-mid)}`
+    ].join("");
+  }
+  var done = /* @__PURE__ */ new WeakSet();
+  function inject(root) {
+    if (done.has(root)) return;
+    done.add(root);
+    const doc = root.nodeType === 9 ? root : root.ownerDocument;
+    const win = doc.defaultView;
+    const text = css(!!win?.CSS?.supports?.("color", "light-dark(#000,#fff)"));
+    if (win && "adoptedStyleSheets" in root) {
+      try {
+        const sheet = new win.CSSStyleSheet();
+        sheet.replaceSync(text);
+        root.adoptedStyleSheets = [...root.adoptedStyleSheets, sheet];
+        return;
+      } catch {
+      }
+    }
+    const style = doc.createElement("style");
+    style.setAttribute("data-hairline-style", "");
+    style.textContent = text;
+    (root.nodeType === 9 ? doc.head ?? doc.documentElement : root).appendChild(style);
+  }
+  return __toCommonJS(kernel_exports);
+})();
+/* /hairline kernel */
+</script>
+<script id="construction-404">
+/**
+ * Construction 404. A 404 built of blocks, broken: the missing blocks lie on
+ * the ground in front of it, and two tower cranes lift them back into their
+ * places while a crew works the site below. A manager points the work out,
+ * a signalman walks with each crane, a shoveler loads a wheelbarrow from the
+ * sand pile, the barrow runs to the mixer, and a labourer carries cement bags
+ * to it. When the last block is set the sign lights up, shakes, and breaks
+ * again, and the work starts over.
+ *
+ * Drawn on the Hairline kernel (HL): rounded solids in one stroke, opaque
+ * plates painted back to front, and one frame loop that sleeps off screen.
+ *
+ * construction404(stage, svg, { t, freeze, onRead }) → { destroy }
+ *   stage   the element carrying data-hairline; it gets the pointer
+ *   svg     an <svg viewBox="0 0 800 450"> inside it
+ *   t       seconds to run the site forward before the first frame
+ *   freeze  draw that one frame and stop
+ *   onRead  called with a short status: "fixing 3/8", "fixed", "breaking"
+ */
+function construction404(stage, svg, opts = {}) {
+  const {
+    Cam, proj, fit, rrect, circ, prism, ringAt, run, hull, poly, open, seg, clamp, lerp, rad, r2,
+    mk, solid, place, register, disposer, reducedMotion,
+  } = HL;
+  const bag = disposer();
+  const onRead = opts.onRead || (() => {});
+
+  // ---------------------------------------------------------------- camera
+  const VW = 800, VH = 450, AZ = opts.az ?? 20, K = opts.k ?? 0.45;
+  const sA = Math.sin(rad(AZ)), cA = Math.cos(rad(AZ)), ZF = Math.sqrt(1 - K * K);
+  /** Toward the viewer, for normals that are not horizontal. */
+  const VIEW = [sA * ZF, cA * ZF, K];
+  /** Larger is nearer: the painter's key on the ground. */
+  const depth = (x, y) => x * sA + y * cA;
+  const front = (q) => q.nu * sA + q.nv * cA >= -1e-6;
+  const TAU = Math.PI * 2;
+  const wrap = (a) => (((a + Math.PI) % TAU) + TAU) % TAU - Math.PI;
+  const smooth = (t) => t * t * t * (t * (t * 6 - 15) + 10);
+  const lerpA = (a, b, t) => a + wrap(b - a) * t;
+
+  // ---------------------------------------------------------------- the site
+  /** A block is SZ wide and tall and SD deep, so the digits read as glyphs with some thickness. */
+  const SZ = 15, SD = 8, PITCH = 15.8, SL = 7, SAFE = 116, HOOK_GROUND = SZ + 2 + SL, JIB = 178;
+  const GROUND = [-125, -46, 300, 136];
+  const FOUR = ["X.X", "X.X", "XXX", "..X", "..X"], ZERO = ["XXX", "X.X", "X.X", "X.X", "XXX"];
+  /** The blocks that break, by "column,level", and where each lands: x, y, yaw in degrees. */
+  const BROKEN = {
+    "0,4": [-4, 42, 14], "2,4": [40, 40, -12], "5,4": [82, 60, 18],
+    "6,3": [116, 40, -10], "6,4": [134, 62, 16], "10,4": [176, 44, 6],
+  };
+  const CRANES = [
+    { x: -62, y: 4, H: 138, park: rad(16), take: (col) => col <= 5, home: [22, 84] },
+    { x: 236, y: 4, H: 154, park: rad(164), take: (col) => col >= 6, home: [196, 82] },
+  ];
+  const PILE = [-50, 96], MIXER = [272, 52], PALLET = [276, -8];
+
+  const slots = [];
+  [FOUR, ZERO, FOUR].forEach((digit, d) => digit.forEach((row, r) => [...row].forEach((ch, c) => {
+    if (ch !== "X") return;
+    const col = d * 4 + c, lvl = 4 - r;
+    slots.push({ col, lvl, x0: col * PITCH, z0: lvl * PITCH, cx: col * PITCH + SZ / 2, cy: SD / 2, spot: BROKEN[col + "," + lvl] });
+  })));
+  const slotAt = (col, lvl) => slots.find((s) => s.col === col && s.lvl === lvl);
+  const broken = slots.filter((s) => s.spot);
+
+  // Fit the camera to the ground, the crane heads, and every pose the jibs reach.
+  const C = Cam(AZ, K, 1);
+  const fitPts = [];
+  for (const x of [GROUND[0], GROUND[2]]) for (const y of [GROUND[1], GROUND[3]]) fitPts.push([x, y, -6]);
+  for (const k of CRANES) {
+    fitPts.push([k.x, k.y, k.H + 34]);
+    for (const s of broken.filter((s) => k.take(s.col))) for (const [x, y] of [[s.cx, s.cy], s.spot]) {
+      const a = Math.atan2(y - k.y, x - k.x);
+      fitPts.push([k.x + JIB * Math.cos(a), k.y + JIB * Math.sin(a), k.H + 9], [k.x - 58 * Math.cos(a), k.y - 58 * Math.sin(a), k.H + 9]);
+    }
+  }
+  {
+    const P1 = proj(C);
+    let a = 1e9, b = -1e9, c = 1e9, d = -1e9;
+    for (const p of fitPts) { const q = P1(p[0], p[1], p[2]); a = Math.min(a, q[0]); b = Math.max(b, q[0]); c = Math.min(c, q[1]); d = Math.max(d, q[1]); }
+    C.S = Math.min((VW - 24) / (b - a), (VH - 24) / (d - c));
+    fit(C, fitPts, VW / 2, VH / 2);
+  }
+  const P = proj(C), S = C.S;
+  const P3 = (p) => P(p[0], p[1], p[2]);
+
+  // ---------------------------------------------------------------- drawing helpers
+  const ground = mk("g", {}, svg), layer = mk("g", {}, svg), tops = mk("g", {}, svg);
+  /** Everything that stands on the ground is an item, repainted in depth order. */
+  const items = [];
+  const item = (g, key = 0) => { const it = { g, key }; items.push(it); return it; };
+  const setD = (el, d) => { if (el.__d !== d) { el.__d = d; el.setAttribute("d", d); } };
+  const flag = (el, cls, on) => { const k = "__" + cls; if (el[k] !== on) { el[k] = on; el.classList.toggle(cls, on); } };
+  const putC = (el, s) => { setD(el.sil, s.sil); setD(el.cr, s.crease); };
+
+  /** A rounded footprint turned by th about (cx, cy), with its normals turned too. */
+  function rring(cx, cy, th, u0, v0, u1, v1, r, n = 4) {
+    const c = Math.cos(th), s = Math.sin(th);
+    return rrect(u0, v0, u1, v1, r, n).map((q) => ({
+      u: cx + q.u * c - q.v * s, v: cy + q.u * s + q.v * c, nu: q.nu * c - q.nv * s, nv: q.nu * s + q.nv * c,
+    }));
+  }
+  /** A rounded box in a frame turned by th: a silhouette and one crease. */
+  function rbox(cx, cy, th, u0, v0, u1, v1, z0, z1, r = 1.2, b = 0.7) {
+    const ring = rring(cx, cy, th, u0, v0, u1, v1, r);
+    const inner = b > 0 ? rring(cx, cy, th, u0 + b, v0 + b, u1 - b, v1 - b, Math.max(0.3, r - b)) : null;
+    return prism(P, front, ring, inner, z0, z1);
+  }
+  const moved = (ring, x, y) => ring.map((q) => ({ ...q, u: q.u + x, v: q.v + y }));
+  const v3 = {
+    add: (a, b) => [a[0] + b[0], a[1] + b[1], a[2] + b[2]],
+    sub: (a, b) => [a[0] - b[0], a[1] - b[1], a[2] - b[2]],
+    mul: (a, k) => [a[0] * k, a[1] * k, a[2] * k],
+    lerp: (a, b, t) => [lerp(a[0], b[0], t), lerp(a[1], b[1], t), lerp(a[2], b[2], t)],
+    norm: (a) => { const l = Math.hypot(a[0], a[1], a[2]) || 1; return [a[0] / l, a[1] / l, a[2] / l]; },
+  };
+
+  // ---------------------------------------------------------------- ground and props
+  {
+    const [x0, y0, x1, y1] = GROUND;
+    const outer = rrect(x0, y0, x1, y1, 36, 14), inner = rrect(x0 + 2.4, y0 + 2.4, x1 - 2.4, y1 - 2.4, 33.6, 14);
+    putC(solid(ground), prism(P, front, outer, inner, -6, 0));
+  }
+
+  function sandPile([x, y]) {
+    const g = mk("g", {}, layer), foot = [], top = [];
+    for (let i = 0; i < 32; i++) {
+      const a = (i / 32) * TAU, w = 1 + 0.07 * Math.sin(a * 3 + 1);
+      foot.push(P(x + 17 * w * Math.cos(a), y + 14 * w * Math.sin(a), 0));
+      top.push(P(x - 3 + 4.5 * Math.cos(a), y - 1 + 3.5 * Math.sin(a), 12.5));
+    }
+    mk("path", { class: "sil", d: poly(hull(foot.concat(top))) }, g);
+    mk("path", { class: "nf lo", d: open([P(x - 1, y + 2, 11.5), P(x + 2, y + 7, 6.5), P(x + 6, y + 12.5, 0.6)]) + open([P(x - 6, y + 2, 10.5), P(x - 8, y + 8, 5), P(x - 11, y + 12, 0.6)]) }, g);
+    item(g, depth(x, y));
+  }
+
+  function bagPallet([x, y]) {
+    const g = mk("g", {}, layer);
+    putC(solid(g), rbox(x, y, 0, -13, -10, 13, 10, 0, 2.8, 1, 0.6));
+    for (const u of [-8.4, 0, 8.4]) putC(solid(g), rbox(x + u, y, 0, -3.9, -9.2, 3.9, 9.2, 2.8, 6.8, 2.6, 0.9));
+    for (const v of [-4.6, 4.6]) putC(solid(g), rbox(x, y + v, 0, -12.4, -4.3, 12.4, 4.3, 6.8, 10.8, 2.6, 0.9));
+    item(g, depth(x, y));
+  }
+
+  function cone(x, y) {
+    const g = mk("g", {}, layer);
+    putC(solid(g), rbox(x, y, 0, -3.4, -3.4, 3.4, 3.4, 0, 1, 0.9, 0));
+    mk("path", { class: "sil", d: poly(hull(ringAt(P, moved(circ(2.5, 24), x, y), 1).concat(ringAt(P, moved(circ(0.6, 12), x, y), 9)))) }, g);
+    mk("path", { class: "nf", d: open(ringAt(P, run(moved(circ(1.55, 24), x, y), front), 5)) }, g);
+    item(g, depth(x, y));
+  }
+
+  function makeMixer([x, y], psi) {
+    const g = mk("g", {}, layer), tilt = rad(26);
+    const a = [Math.cos(psi) * Math.cos(tilt), Math.sin(psi) * Math.cos(tilt), Math.sin(tilt)];
+    const e1 = [-Math.sin(psi), Math.cos(psi), 0];
+    const e2 = [a[1] * e1[2] - a[2] * e1[1], a[2] * e1[0] - a[0] * e1[2], a[0] * e1[1] - a[1] * e1[0]];
+    const O = [x - a[0] * 5, y - a[1] * 5, 12.5];
+    const dir = (b) => v3.add(v3.mul(e1, Math.cos(b)), v3.mul(e2, Math.sin(b)));
+    const at = (t, R, b) => v3.add(v3.add(O, v3.mul(a, t)), v3.mul(dir(b), R));
+    const vis = (b) => { const n = dir(b); return n[0] * VIEW[0] + n[1] * VIEW[1] + n[2] * VIEW[2] > 0; };
+    const ring = (t, R, n = 36) => Array.from({ length: n }, (_, i) => P3(at(t, R, (i / n) * TAU)));
+    const side = -Math.sin(psi) * sA + Math.cos(psi) * cA >= 0 ? 1 : -1;
+    const W = (u, v, z) => P(x + u * Math.cos(psi) - v * Math.sin(psi), y + u * Math.sin(psi) + v * Math.cos(psi), z);
+
+    putC(solid(g), rbox(x, y, psi, -12, -5.5, 9, 5.5, 3.6, 6, 1.2, 0.6));
+    putC(solid(g), rbox(x, y, psi, -13, -4.4, -6.5, 4.4, 6, 12.5, 1.2, 0.6));
+    const wheel = [];
+    for (let i = 0; i < 24; i++) { const b = (i / 24) * TAU; wheel.push(W(-3 + 3.6 * Math.cos(b), side * 6.6, 3.6 + 3.6 * Math.sin(b))); }
+    mk("path", { class: "sil", d: poly(wheel) }, g);
+    mk("path", { class: "nf sil", d: open([W(9, 0, 4.4), W(17, 0, 1.6)]) + open([W(7.5, 0, 3.6), W(7.5, 0, 0)]) + seg(W(-1, -3, 6), P3(at(3, 7.6, -Math.PI / 2))) + seg(W(-1, 3, 6), P3(at(3, 7.6, -Math.PI / 2))) }, g);
+    mk("path", { class: "sil", d: poly(hull([...ring(-3.6, 6.4), ...ring(0, 8.8), ...ring(8, 8.8), ...ring(15, 4.8)])) }, g);
+    const band = [];
+    for (let i = 0; i <= 48; i++) { const b = (i / 48) * TAU; if (vis(b)) band.push(P3(at(8, 8.8, b))); }
+    mk("path", { class: "nf lo", d: open(band) }, g);
+    const fins = mk("path", { class: "nf" }, g);
+    const mouthOpen = a[0] * VIEW[0] + a[1] * VIEW[1] + a[2] * VIEW[2] > 0;
+    if (mouthOpen) {
+      mk("path", { d: poly(ring(15, 4.8)) }, g);
+      mk("path", { class: "nf lo", d: poly(ring(14.4, 3.3)) }, g);
+    }
+    item(g, depth(x, y));
+    const m = { spin: 0 };
+    m.draw = () => {
+      let d = "";
+      for (let k = 0; k < 3; k++) {
+        let pts = [];
+        for (let t = 0; t <= 8; t += 0.5) {
+          const b = m.spin + (k * TAU) / 3 + t * 0.16;
+          if (vis(b)) pts.push(P3(at(t, 8.8, b)));
+          else { d += open(pts); pts = []; }
+        }
+        d += open(pts);
+      }
+      setD(fins, d);
+    };
+    return m;
+  }
+
+  // ---------------------------------------------------------------- the 404
+  /** A crack on a block's front face, running in from the side its missing neighbour was on. */
+  function crackPath(b, from) {
+    const fy = SD + 0.05, x0 = b.x0, z0 = b.z0, j = ((b.col * 7 + b.lvl * 3) % 5) / 5, q = SZ / 11;
+    const pts = from === "top"
+      ? [[3 + j * 3, 11], [5 + j, 8], [3.8, 6.2], [6, 3.6]]
+      : from === "left"
+        ? [[0, 6 + j * 2], [3, 7.4], [4.6, 5], [7.4, 5.8]]
+        : [[11, 6 + j * 2], [8, 4.4], [6.2, 6.4], [3.8, 5]];
+    return open(pts.map(([x, z]) => P(x0 + x * q, fy, z0 + z * q)));
+  }
+
+  const blocks = slots.map((s) => {
+    const g = mk("g", {}, layer);
+    const el = solid(g), crack = mk("path", { class: "nf sil" }, g);
+    const b = { slot: s, x: s.cx, y: s.cy, z: s.z0, yaw: 0, state: "slot", el, crack, it: item(g), drawn: "", dust: [] };
+    s.block = b;
+    if (s.spot) { b.x = s.spot[0]; b.y = s.spot[1]; b.z = 0; b.yaw = rad(s.spot[2]); b.state = "ground"; }
+    return b;
+  });
+  // Where a missing block leaves a crack in the block next to it.
+  const cracks = [];
+  for (const s of broken) {
+    const below = slotAt(s.col, s.lvl - 1), left = slotAt(s.col - 1, s.lvl), right = slotAt(s.col + 1, s.lvl);
+    const n = below && !below.spot ? [below, "top"] : left && !left.spot ? [left, "right"] : right && !right.spot ? [right, "left"] : null;
+    if (n) cracks.push({ gap: s, on: n[0].block, d: crackPath(n[0], n[1]) });
+  }
+  // A dashed outline where each missing block goes.
+  const ghosts = broken.map((s) => {
+    const g = mk("g", {}, layer);
+    const d = rbox(s.cx, s.cy, 0, -SZ / 2, -SD / 2, SZ / 2, SD / 2, s.z0, s.z0 + SZ, 2.4, 0).sil;
+    return { s, d, el: mk("path", { class: "nf dash hi" }, g), it: item(g, depth(s.cx, s.cy) + s.z0 * 1e-3 - 1e-4) };
+  });
+
+  function drawBlock(b, dx = 0, dz = 0) {
+    const key = r2(b.x + dx) + "," + r2(b.y) + "," + r2(b.z + dz) + "," + r2(b.yaw);
+    if (key !== b.drawn) { b.drawn = key; putC(b.el, rbox(b.x + dx, b.y, b.yaw, -SZ / 2, -SD / 2, SZ / 2, SD / 2, b.z + dz, b.z + dz + SZ, 2.4, 1)); }
+    b.it.key = depth(b.x, b.y) + b.z * 1e-3;
+  }
+
+  // ---------------------------------------------------------------- cranes
+  function makeCrane(c) {
+    const k = { ...c, th: c.park, r: 64, h: SAFE, steps: [], cur: null, job: null, queue: [], sx: 0, sy: 0, svx: 0, svy: 0, tp: null, tv: [0, 0], side: null };
+    const { x, y, H } = c;
+    // footing, mast and its lattice
+    const g = mk("g", {}, layer);
+    putC(solid(g), rbox(x, y, 0, -13, -13, 13, 13, 0, 4.5, 3, 1.2));
+    putC(solid(g), rbox(x, y, 0, -4.6, -4.6, 4.6, 4.6, 4.5, H, 1.2, 0.6));
+    let lat = "";
+    const zs = [];
+    for (let z = 6; z <= H - 2; z += 7.5) zs.push(z);
+    lat += open(zs.map((z, i) => P(x + 4.6, y + (i % 2 ? 3.2 : -3.2), z)));
+    lat += open(zs.map((z, i) => P(x + (i % 2 ? -3.2 : 3.2), y + 4.6, z)));
+    mk("path", { class: "nf", d: lat }, g);
+    item(g, depth(x, y));
+    // the hook, its cable and slings: an item, so it paints in depth order with the load
+    const hg = mk("g", {}, layer);
+    k.cable = mk("path", { class: "nf" }, hg);
+    k.block = solid(hg);
+    k.hook = mk("path", { class: "nf sil" }, hg);
+    k.sling = mk("path", { class: "nf" }, hg);
+    k.hookIt = item(hg);
+    // the slewing top: painted after everything on the ground
+    const t = mk("g", {}, tops);
+    k.parts = {
+      cw: solid(t), cj: solid(t), cjl: mk("path", { class: "nf" }, t), apex: mk("path", { class: "sil" }, t),
+      turn: solid(t), cab: solid(t), win: mk("path", { class: "nf" }, t),
+      trolley: solid(t), jib: solid(t), jl: mk("path", { class: "nf" }, t), ties: mk("path", { class: "nf" }, t),
+    };
+    k.top = t;
+    return k;
+  }
+
+  function drawCrane(k) {
+    const { x, y, H, th, r } = k, p = k.parts, c = Math.cos(th), s = Math.sin(th);
+    const L = (u, v, z) => P(x + u * c - v * s, y + u * s + v * c, z);
+    const away = c * sA + s * cA < 0;
+    if (away !== k.side) {
+      k.side = away;
+      const back = [p.cw.g, p.cj.g, p.cjl, p.apex, p.turn.g, p.cab.g, p.win], jib = [p.trolley.g, p.jib.g, p.jl];
+      for (const e of away ? [...jib, ...back.slice().reverse()] : [...back, ...jib]) k.top.appendChild(e);
+      k.top.appendChild(p.ties);
+    }
+    putC(p.cw, rbox(x, y, th, -58, -5.5, -44, 5.5, H - 9, H + 4, 1.6, 0.8));
+    putC(p.cj, rbox(x, y, th, -55, -3.2, -4, 3.2, H + 2.5, H + 7.5, 1, 0.6));
+    const ns = -s * sA + c * cA >= 0 ? 1 : -1;
+    const zig = (u0, u1, step, v, za, zb) => { const pts = []; for (let u = u0, i = 0; u <= u1; u += step, i++) pts.push(L(u, v, i % 2 ? zb : za)); return open(pts); };
+    setD(p.cjl, zig(-42, -6, 6, ns * 3.2, H + 3, H + 7));
+    const foot = rring(x, y, th, -3.8, -3.8, 3.8, 3.8, 1), head = rring(x, y, th, -1.1, -1.1, 1.1, 1.1, 0.5);
+    setD(p.apex, poly(hull(ringAt(P, foot, H + 9).concat(ringAt(P, head, H + 34)))));
+    putC(p.turn, rbox(x, y, th, -7, -7, 7, 7, H, H + 2.5, 2, 0.8));
+    putC(p.cab, rbox(x, y, th, -1, 4, 8, 11, H + 2.5, H + 10.5, 1.4, 0.7));
+    const winFace = c * sA + s * cA >= 0;
+    setD(p.win, winFace ? poly([L(8.05, 5.4, H + 5), L(8.05, 9.6, H + 5), L(8.05, 9.6, H + 9), L(8.05, 5.4, H + 9)]) : "");
+    putC(p.trolley, rbox(x, y, th, r - 4, -3.6, r + 4, 3.6, H - 1.4, H + 2.6, 1, 0.5));
+    putC(p.jib, rbox(x, y, th, -4, -3, JIB, 3, H + 2.5, H + 9, 1, 0.6));
+    setD(p.jl, zig(4, JIB - 4, 7.5, ns * 3, H + 3, H + 8.5));
+    const A = P(x, y, H + 34);
+    setD(p.ties, seg(A, L(70, 0, H + 9)) + seg(A, L(136, 0, H + 9)) + seg(A, L(-52, 0, H + 7.5)));
+
+    // hook, cable, slings and load
+    const tx = x + r * c, ty = y + r * s, hx = tx + k.sx, hy = ty + k.sy, h = k.h;
+    const n = [-s * 1.1, c * 1.1];
+    setD(k.cable, seg(P(tx + n[0], ty + n[1], H - 1.4), P(hx + n[0], hy + n[1], h + 6.5)) + seg(P(tx - n[0], ty - n[1], H - 1.4), P(hx - n[0], hy - n[1], h + 6.5)));
+    putC(k.block, rbox(hx, hy, th, -2.6, -2.6, 2.6, 2.6, h + 1, h + 6.5, 1, 0.5));
+    const H2 = (u, z) => P(hx + u * c, hy + u * s, z);
+    setD(k.hook, open([H2(0, h + 1), H2(0, h - 1.2), H2(0.7, h - 2.5), H2(1.9, h - 2.6), H2(2.5, h - 1.6)]));
+    const load = k.job && k.job.state === "carried" ? k.job : null;
+    if (load) {
+      const cc = Math.cos(load.yaw), ss = Math.sin(load.yaw), top = load.z + SZ, hk = P(hx, hy, h - 2);
+      setD(k.sling, [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => seg(hk, P(load.x + 5.9 * u * cc - 3 * v * ss, load.y + 5.9 * u * ss + 3 * v * cc, top))).join(""));
+    } else setD(k.sling, "");
+    k.hookIt.key = depth(hx, hy) + 0.02 + (load ? load.z * 1e-3 : 0);
+  }
+
+  /** The trolley's radius and the jib's angle that put the hook over (px, py). */
+  const polar = (k, px, py) => [Math.atan2(py - k.y, px - k.x), Math.hypot(px - k.x, py - k.y)];
+
+  function planJob(k, b) {
+    const s = b.slot, [pt, pr] = polar(k, b.x, b.y), [st, sr] = polar(k, s.cx, s.cy);
+    k.job = b;
+    k.steps.push(
+      { h: SAFE }, { th: pt, r: pr }, { h: HOOK_GROUND, low: true },
+      { wait: 0.6, low: true, then: () => { b.state = "carried"; } },
+      { h: SAFE }, { th: st, r: sr }, { h: s.z0 + SZ + 2 + SL, low: true, place: true },
+      { wait: 0.5, low: true, place: true, then: () => { Object.assign(b, { state: "slot", x: s.cx, y: s.cy, z: s.z0, yaw: 0 }); k.job = null; } },
+      { h: SAFE },
+    );
+  }
+
+  function craneStep(k, dt) {
+    if (!k.cur) {
+      if (!k.steps.length) {
+        if (k.queue.length) planJob(k, k.queue.shift());
+        else if (Math.abs(wrap(k.park - k.th)) > 0.01 || Math.abs(k.r - 64) > 0.5 || Math.abs(k.h - SAFE) > 0.5) k.steps.push({ h: SAFE }, { th: k.park, r: 64 });
+        else k.steps.push({ wait: 0.3 });
+      }
+      const st = k.steps.shift();
+      st.t = 0;
+      st.f = { th: k.th, r: k.r, h: k.h };
+      if (st.th != null) { st.dth = wrap(st.th - k.th); st.dur = Math.max(0.9, 0.6 + Math.abs(st.dth) * 1.1 + Math.abs(st.r - k.r) / 90); }
+      else if (st.h != null) st.dur = Math.max(0.5, 0.35 + Math.abs(st.h - k.h) / 55);
+      else st.dur = st.wait;
+      k.cur = st;
+    }
+    const st = k.cur;
+    st.t += dt;
+    const e = smooth(clamp(st.t / st.dur, 0, 1));
+    if (st.th != null) { k.th = st.f.th + st.dth * e; k.r = lerp(st.f.r, st.r, e); }
+    if (st.h != null) k.h = lerp(st.f.h, st.h, e);
+    if (st.t >= st.dur) { k.cur = null; if (st.then) st.then(); }
+  }
+
+  /** The load swings on its cable: a pendulum driven by the trolley's acceleration, held still near the ground. */
+  function swing(k, dt) {
+    const tx = k.x + k.r * Math.cos(k.th), ty = k.y + k.r * Math.sin(k.th);
+    if (!k.tp) k.tp = [tx, ty];
+    const vx = (tx - k.tp[0]) / dt, vy = (ty - k.tp[1]) / dt, ax = (vx - k.tv[0]) / dt, ay = (vy - k.tv[1]) / dt;
+    k.tp = [tx, ty]; k.tv = [vx, vy];
+    const damp = k.h < SAFE - 8 ? 7 : 0.9;
+    k.svx += (-9 * k.sx - damp * k.svx - clamp(ax, -400, 400)) * dt;
+    k.svy += (-9 * k.sy - damp * k.svy - clamp(ay, -400, 400)) * dt;
+    k.sx = clamp(k.sx + k.svx * dt, -6, 6);
+    k.sy = clamp(k.sy + k.svy * dt, -6, 6);
+    const b = k.job;
+    if (b && b.state === "carried") {
+      b.x = tx + k.sx; b.y = ty + k.sy; b.z = k.h - 2 - SL - SZ;
+      b.yaw = wrap(b.yaw) * Math.max(0, 1 - dt * 1.4);
+    }
+  }
+
+  // ---------------------------------------------------------------- people
+  const HEAD = 2.2;
+  function makePerson(x, y, f, o = {}) {
+    const g = mk("g", {}, layer);
+    const p = { x, y, f, phase: 0, amp: 0, moving: false, speed: o.speed || 20, boss: !!o.boss, arms: null, extra: null, it: item(g) };
+    p.legA = mk("path", { class: "nf sil" }, g);
+    p.legB = mk("path", { class: "nf sil" }, g);
+    p.back = mk("g", {}, g);
+    p.armA = mk("path", { class: "nf sil" }, g);
+    p.torso = mk("path", { class: "sil" }, g);
+    p.vest = mk("path", { class: "nf" }, g);
+    p.head = mk("ellipse", { class: "sil", rx: r2(HEAD * S), ry: r2(HEAD * S) }, g);
+    p.hat = mk("path", { class: o.boss ? "hi" : "sil" }, g);
+    p.armB = mk("path", { class: "nf sil" }, g);
+    p.front = mk("g", {}, g);
+    return p;
+  }
+
+  /** Local to world for a body facing f: u forward, v to its left, z up. */
+  const frame = (x, y, f) => {
+    const c = Math.cos(f), s = Math.sin(f);
+    return (u, v, z) => [x + u * c - v * s, y + u * s + v * c, z];
+  };
+
+  function drawPerson(p) {
+    const Wd = frame(p.x, p.y, p.f), W = (u, v, z) => P3(Wd(u, v, z));
+    const sf = Math.sin(p.f), cf = Math.cos(p.f);
+    const near = -sf * sA + cf * cA >= 0 ? 1 : -1;
+    const leg = (s) => {
+      const ph = p.phase + (s > 0 ? 0 : Math.PI), fu = 2.6 * p.amp * Math.sin(ph), fz = 1.4 * p.amp * Math.max(0, Math.cos(ph));
+      return open([W(0, s * 1.1, 8.8), W(fu * 0.5 + 0.6 * p.amp, s * 1.15, 4.6 + fz * 0.6), W(fu, s * 1.2, fz)]);
+    };
+    setD(p.legA, leg(-near));
+    setD(p.legB, leg(near));
+    const arm = (s) => {
+      const own = p.arms && p.arms(s, Wd);
+      const sh = W(0, s * 2.5, 15.8);
+      if (own) return open([sh, ...own.map(P3)]);
+      const ph = p.phase + (s > 0 ? Math.PI : 0), sw = 2.3 * p.amp * Math.sin(ph);
+      return open([sh, W(sw * 0.45 - 0.2, s * 2.9, 12.6), W(sw, s * 3, 9.6)]);
+    };
+    setD(p.armA, arm(-near));
+    setD(p.armB, arm(near));
+    const ring = rring(p.x, p.y, p.f, -1.4, -2.4, 1.4, 2.4, 1.3);
+    setD(p.torso, poly(hull(ringAt(P, ring, 8.6).concat(ringAt(P, ring, 16.6)))));
+    setD(p.vest, p.boss ? "" : open(ringAt(P, run(ring, front), 12.8)));
+    place(p.head, W(0, 0, 19.2));
+    const hc = W(0.25, 0, 19.9), rx = 2.75 * S, ry = 2.3 * S, bw = rx + 1.1 * S;
+    setD(p.hat, `M${r2(hc[0] - rx)} ${r2(hc[1])}A${r2(rx)} ${r2(ry)} 0 0 1 ${r2(hc[0] + rx)} ${r2(hc[1])}ZM${r2(hc[0] - bw)} ${r2(hc[1] + 0.2)}L${r2(hc[0] + bw)} ${r2(hc[1] + 0.2)}`);
+    if (p.extra) p.extra(p, Wd, near);
+    p.it.key = depth(p.x, p.y);
+  }
+
+  /** Moves a body one step toward (tx, ty): it turns first, then walks. True once it is there. */
+  function walkTo(p, tx, ty, dt, speed = p.speed) {
+    const dx = tx - p.x, dy = ty - p.y, d = Math.hypot(dx, dy);
+    if (d < 0.5) { p.moving = false; return true; }
+    const want = Math.atan2(dy, dx), off = Math.abs(wrap(want - p.f));
+    turnTo(p, want, dt, 6);
+    if (off < 1) {
+      const step = Math.min(d, speed * dt * (1 - off * 0.5));
+      p.x += (dx / d) * step; p.y += (dy / d) * step; p.phase += step * 0.42; p.moving = true;
+    } else p.moving = false;
+    return false;
+  }
+  const turnTo = (p, want, dt, rate = 4) => { p.f += clamp(wrap(want - p.f), -rate * dt, rate * dt); };
+  const toward = (p, q) => Math.atan2(q[1] - p.y, q[0] - p.x);
+
+  /** A route is a loop of steps: { to }, { face }, { wait }, { until }, each with an optional then. */
+  function runRoute(p, dt) {
+    const st = p.route[p.ri];
+    let done = false;
+    if (st.to) done = walkTo(p, st.to[0], st.to[1], dt);
+    else {
+      p.moving = false;
+      if (st.face != null) { turnTo(p, st.face, dt); done = Math.abs(wrap(st.face - p.f)) < 0.04; }
+      else if (st.wait != null) { p.wt = (p.wt || 0) + dt; done = p.wt >= st.wait; }
+      else if (st.until) done = st.until();
+    }
+    if (done) { p.wt = 0; p.ri = (p.ri + 1) % p.route.length; if (st.then) st.then(); }
+  }
+
+  // ---- the wheelbarrow, pushed by one worker
+  function makeBarrow() {
+    const g = mk("g", {}, layer);
+    const b = { x: 0, y: 0, f: 0, fill: 0, roll: 0, pitch: 0, it: item(g) };
+    b.wheelA = mk("path", { class: "sil" }, g); b.spokeA = mk("path", { class: "nf" }, g);
+    b.frame = mk("path", { class: "nf sil" }, g);
+    b.tray = mk("path", { class: "sil" }, g);
+    b.load = mk("path", {}, g);
+    b.rim = mk("path", { class: "nf" }, g);
+    b.wheelB = mk("path", { class: "sil" }, g); b.spokeB = mk("path", { class: "nf" }, g);
+    return b;
+  }
+  /** The barrow's own frame: u forward to the wheel, pitched about the axle so the legs lift when pushed. */
+  const barrowFrame = (b) => {
+    const W0 = frame(b.x, b.y, b.f), ca = Math.cos(b.pitch), sa = Math.sin(b.pitch);
+    return (u, v, z) => { const du = u - 7.6, dz = z - 3.2; return W0(7.6 + du * ca + dz * sa, v, 3.2 + dz * ca - du * sa); };
+  };
+  const TRAY = { foot: rrect(-4.4, -2.6, 3.4, 2.6, 1.4), top: rrect(-6.8, -4.4, 5.4, 4.4, 2.2), inner: rrect(-6, -3.6, 4.6, 3.6, 1.6), heap: rrect(-3.8, -2.1, 2.4, 2.1, 1.8) };
+  function drawBarrow(b) {
+    const Wd = barrowFrame(b), W = (u, v, z) => P3(Wd(u, v, z)), cf = Math.cos(b.f), sf = Math.sin(b.f);
+    const wheelNear = cf * sA + sf * cA > 0;
+    const wheel = [];
+    for (let i = 0; i < 22; i++) { const a = (i / 22) * TAU; wheel.push(W(7.6 + 3.2 * Math.cos(a), 0, 3.2 + 3.2 * Math.sin(a))); }
+    const spokes = [0, 1].map((n) => { const a = b.roll + (n * Math.PI) / 2; return seg(W(7.6 + 3 * Math.cos(a), 0, 3.2 + 3 * Math.sin(a)), W(7.6 - 3 * Math.cos(a), 0, 3.2 - 3 * Math.sin(a))); }).join("");
+    setD(b.wheelA, wheelNear ? "" : poly(wheel)); setD(b.spokeA, wheelNear ? "" : spokes);
+    setD(b.wheelB, wheelNear ? poly(wheel) : ""); setD(b.spokeB, wheelNear ? spokes : "");
+    let fr = "";
+    for (const s of [-1, 1]) fr += open([W(7.6, s * 1.2, 3.2), W(-4.6, s * 2.8, 4.6), W(-12.6, s * 3.1, 8.2)]) + open([W(-3.2, s * 2.8, 4.6), W(-3.8, s * 3, 0)]);
+    setD(b.frame, fr);
+    const at = (ring, z) => ring.map((q) => W(q.u, q.v, z));
+    setD(b.tray, poly(hull(at(TRAY.foot, 4.6).concat(at(TRAY.top, 9.8)))));
+    const facesV = (q) => (q.nu * cf - q.nv * sf) * sA + (q.nu * sf + q.nv * cf) * cA >= 0;
+    if (b.fill > 0.02) {
+      setD(b.load, poly(hull(at(TRAY.inner, 9.8).concat(at(TRAY.heap, 9.8 + 3.4 * b.fill)))));
+      setD(b.rim, open(at(run(TRAY.inner, facesV), 9.8)));
+    } else { setD(b.load, ""); setD(b.rim, poly(at(TRAY.inner, 9.8))); }
+    b.it.key = depth(b.x, b.y);
+  }
+
+  // ---------------------------------------------------------------- build the site, back to front
+  sandPile(PILE);
+  bagPallet(PALLET);
+  cone(-96, 50); cone(-104, 72); cone(-100, 116); cone(-84, 126);
+  const mixer = makeMixer(MIXER, rad(160));
+  const cranes = CRANES.map(makeCrane);
+  if (depth(cranes[0].x, cranes[0].y) > depth(cranes[1].x, cranes[1].y)) tops.appendChild(cranes[0].top);
+
+  // the manager: clipboard in one hand, the other points at whatever is being set down
+  const boss = makePerson(124, 100, rad(-100), { boss: true });
+  boss.pw = 0; boss.target = [66, 6, 40]; boss.home = rad(-100);
+  boss.clip = mk("path", { class: "sil" }, boss.front);
+  boss.arms = (s, Wd) => {
+    if (s < 0) return [Wd(1, -3, 12.2), Wd(2.6, -1.8, 12.6)];
+    const sh = Wd(0, 2.5, 15.8), d = v3.norm(v3.sub(boss.target, sh));
+    const w = boss.pw;
+    return [v3.lerp(Wd(-0.2, 2.9, 12.6), v3.add(sh, v3.mul(d, 3.7)), w), v3.lerp(Wd(0, 3, 9.6), v3.add(sh, v3.mul(d, 7.4)), w)];
+  };
+  boss.extra = (p, Wd) => {
+    const facing = Math.cos(p.f) * sA + Math.sin(p.f) * cA >= 0, parent = facing ? p.front : p.back;
+    if (p.clip.parentNode !== parent) parent.appendChild(p.clip);
+    setD(p.clip, poly([Wd(2.4, -3.1, 11.6), Wd(3.1, -3.1, 15.2), Wd(3.1, 0.2, 15.2), Wd(2.4, 0.2, 11.6)].map(P3)));
+  };
+
+  // a signalman for each crane: walks to the block, raises an arm while the hook comes down
+  const signals = cranes.map((k) => {
+    const p = makePerson(k.home[0], k.home[1], rad(-100), { speed: 26 });
+    p.k = k; p.raise = 0; p.cheer = 0; p.t = 0;
+    p.arms = (s, Wd) => {
+      const t = p.t * 9;
+      if (p.cheer > 0.01) {
+        const up = [Wd(0.3, s * 3.6, 19.6), Wd(0.2 + Math.sin(t + s) * 0.6, s * 3.3, 23.8)];
+        return [v3.lerp(Wd(-0.2, s * 2.9, 12.6), up[0], p.cheer), v3.lerp(Wd(0, s * 3, 9.6), up[1], p.cheer)];
+      }
+      if (s > 0 || p.raise < 0.01) return null;
+      const up = [Wd(0.4, -3.6, 19.6), Wd(0.4 + Math.sin(t) * 0.8, -3.1, 23.6)];
+      return [v3.lerp(Wd(-0.2, -2.9, 12.6), up[0], p.raise), v3.lerp(Wd(0, -3, 9.6), up[1], p.raise)];
+    };
+    return p;
+  });
+
+  // the onlooker: hands on hips, watching the right crane
+  const watcher = makePerson(212, 110, rad(-120));
+  watcher.arms = (s, Wd) => [Wd(-0.6, s * 4.6, 12.8), Wd(0.2, s * 2.6, 10.2)];
+
+  // the shoveler and the barrow he fills
+  const LOAD = [-6, 116], DUMP = [234, 80];
+  const barrow = makeBarrow();
+  const pusher = makePerson(LOAD[0], LOAD[1], Math.PI, { speed: 20 });
+  pusher.route = [
+    { to: LOAD }, { face: Math.PI }, { until: () => barrow.fill >= 1 },
+    { to: [120, 120] }, { to: DUMP }, { face: toward({ x: DUMP[0], y: DUMP[1] }, MIXER) },
+    { wait: 1.4, then: () => { barrow.dumped = 1; } },
+    { to: [120, 120] },
+  ];
+  pusher.ri = 0;
+  /** The barrow rides 15.5 ahead of its pusher; its wheel turns with the distance. */
+  const hitch = () => {
+    const was = [barrow.x, barrow.y];
+    barrow.f = pusher.f;
+    barrow.x = pusher.x + Math.cos(pusher.f) * 15.5;
+    barrow.y = pusher.y + Math.sin(pusher.f) * 15.5;
+    barrow.roll += Math.hypot(barrow.x - was[0], barrow.y - was[1]) / 3.2;
+  };
+  hitch();
+  pusher.arms = (s, Wd) => {
+    const grip = barrowFrame(barrow)(-12.6, s * 3.1, 8.2), sh = Wd(0, s * 2.5, 15.8);
+    return [v3.add(v3.lerp(sh, grip, 0.5), [0, 0, -1.2]), grip];
+  };
+
+  const shovel = makePerson(-30, 100, Math.PI);
+  shovel.cyc = 0; shovel.tool = mk("path", { class: "nf sil" }, shovel.front); shovel.blade = mk("path", { class: "sil" }, shovel.front);
+  shovel.sand = mk("ellipse", { class: "dot m", rx: r2(1.3 * S), ry: r2(0.8 * S) }, shovel.front);
+  const SHOVEL = {
+    dig: [[0.8, -2.2, 12.4], [6.8, -0.8, 1.6]], lift: [[0.6, -2.4, 13.4], [6.8, -0.6, 8.8]],
+    toss: [[1.2, -2, 14], [7.4, -0.4, 12.6]], rest: [[1.6, -2.6, 14.4], [2.4, -3, 2.2]],
+  };
+  shovel.pose = SHOVEL.rest;
+  shovel.arms = (s, Wd) => {
+    const [G, N] = shovel.pose, at = s < 0 ? G : v3.lerp(G, N, 0.42);
+    const hand = Wd(at[0], at[1], at[2]), sh = Wd(0, s * 2.5, 15.8);
+    return [v3.add(v3.lerp(sh, hand, 0.5), [0, 0, -1.4]), hand];
+  };
+  shovel.extra = (p, Wd) => {
+    const [G, N] = p.pose, d = v3.norm(v3.sub(N, G)), g = Wd(G[0], G[1], G[2]), n = Wd(N[0], N[1], N[2]);
+    const tip = v3.add(N, v3.mul(d, 4.2));
+    const bl = [Wd(N[0], N[1] + 1.7, N[2]), Wd(tip[0], tip[1] + 1.4, tip[2]), Wd(tip[0], tip[1] - 1.4, tip[2]), Wd(N[0], N[1] - 1.7, N[2])];
+    setD(p.tool, seg(P3(g), P3(n)));
+    setD(p.blade, poly(bl.map(P3)));
+    const full = p.cyc > 0.22 && p.cyc < 0.66;
+    flag(p.sand, "off", !full);
+    p.sand.setAttribute("rx", full ? r2(1.3 * S) : "0");
+    place(p.sand, P3(Wd(...v3.add(N, v3.add(v3.mul(d, 2.1), [0, 0, 0.8])))));
+  };
+
+  // the labourer carrying cement bags from the pallet to the mixer
+  const carrier = makePerson(262, 4, rad(40), { speed: 16 });
+  carrier.bag = false;
+  carrier.sack = solid(carrier.front);
+  carrier.route = [
+    { to: [262, 4] }, { face: toward({ x: 262, y: 4 }, PALLET) }, { wait: 0.8, then: () => { carrier.bag = true; } },
+    { to: [256, 34] }, { face: toward({ x: 256, y: 34 }, MIXER) }, { wait: 0.9, then: () => { carrier.bag = false; } },
+  ];
+  carrier.ri = 0;
+  carrier.arms = (s, Wd) => (carrier.bag && s < 0 ? [Wd(0.6, -4.2, 18.6), Wd(1.3, -3, 19.9)] : null);
+  carrier.extra = (p, Wd, near) => {
+    if (!p.bag) { setD(p.sack.sil, ""); setD(p.sack.cr, ""); return; }
+    const parent = near < 0 ? p.front : p.back;
+    if (p.sack.g.parentNode !== parent) parent.appendChild(p.sack.g);
+    const c = Wd(0, -3, 0);
+    putC(p.sack, rbox(c[0], c[1], p.f, -4, -1.7, 4, 1.7, 15.8, 19.4, 1.6, 0.6));
+  };
+
+  const people = [boss, ...signals, watcher, pusher, shovel, carrier];
+
+  // ---------------------------------------------------------------- the story
+  let phase = "rest", pt = 0, clock = 0, read = "";
+  const debris = [];
+  const placedCount = () => broken.filter((s) => s.block.state === "slot").length;
+
+  function director(dt) {
+    pt += dt;
+    if (phase === "rest" && pt > 0.8) {
+      for (const k of cranes) k.queue = broken.filter((s) => k.take(s.col)).sort((a, b) => a.lvl - b.lvl || a.col - b.col).map((s) => s.block);
+      phase = "repair"; pt = 0;
+    } else if (phase === "repair" && placedCount() === broken.length) { phase = "fixed"; pt = 0; }
+    else if (phase === "fixed" && pt > 3.6) { phase = "shake"; pt = 0; }
+    else if (phase === "shake" && pt > 0.8) {
+      phase = "break"; pt = 0;
+      broken.slice().sort((a, b) => b.lvl - a.lvl || a.col - b.col).forEach((s, i) => {
+        const b = s.block;
+        b.state = "falling";
+        b.fall = { t: -i * 0.11, x0: s.cx, y0: s.cy, z0: s.z0, x1: s.spot[0], y1: s.spot[1], yaw: rad(s.spot[2]) + (i % 2 ? TAU : -TAU) * 0.5, dur: 0.75 + s.z0 / 160 };
+      });
+    } else if (phase === "break" && broken.every((s) => s.block.state === "ground")) { phase = "rest"; pt = 0; }
+  }
+
+  function fall(b, dt) {
+    const f = b.fall;
+    f.t += dt;
+    if (f.t < 0) return;
+    if (f.t < f.dur) {
+      const u = f.t / f.dur, vz = 34, g = (2 * (f.z0 + vz * f.dur)) / (f.dur * f.dur);
+      b.x = lerp(f.x0, f.x1, u); b.y = lerp(f.y0, f.y1, u);
+      b.z = Math.max(0, f.z0 + vz * f.t - 0.5 * g * f.t * f.t);
+      b.yaw = f.yaw * u;
+      return;
+    }
+    if (!f.landed) {
+      f.landed = true;
+      for (let i = 0; i < 6; i++) {
+        const a = (i / 6) * TAU + b.slot.col, sp = 14 + (i % 3) * 6;
+        const el = mk("ellipse", { class: "dot m", rx: r2(0.7 * S), ry: r2(0.7 * S * K) }, b.el.g);
+        debris.push({ el, b, x: b.x + Math.cos(a) * 6, y: b.y + Math.sin(a) * 6, z: 2, vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, vz: 16 + (i % 2) * 8, life: 0 });
+      }
+    }
+    const t = f.t - f.dur;
+    b.x = f.x1; b.y = f.y1; b.yaw = wrap(f.yaw);
+    b.z = t < 0.26 ? 2.6 * Math.sin((t / 0.26) * Math.PI) : 0;
+    if (t >= 0.26) { b.state = "ground"; b.fall = null; }
+  }
+
+  function updatePeople(dt) {
+    // the barrow and its pusher
+    runRoute(pusher, dt);
+    hitch();
+    barrow.pitch += ((pusher.moving ? rad(9) : 0) - barrow.pitch) * Math.min(1, dt * 6);
+    if (barrow.dumped) { barrow.fill = Math.max(0, barrow.fill - dt * 1.4); if (!barrow.fill) barrow.dumped = 0; }
+
+    // the shoveler loads while the barrow waits beside him
+    const loading = pusher.ri === 2 && barrow.fill < 1;
+    const fPile = toward(shovel, PILE), fBar = toward(shovel, [barrow.x, barrow.y]);
+    if (loading || shovel.cyc > 0) {
+      const before = shovel.cyc;
+      shovel.cyc += dt / 2.2;
+      if (before < 0.68 && shovel.cyc >= 0.68) barrow.fill = Math.min(1, barrow.fill + 0.25);
+      if (shovel.cyc >= 1) shovel.cyc = loading ? shovel.cyc - 1 : 0;
+      const c = shovel.cyc, A = SHOVEL.dig, B = SHOVEL.lift, T = SHOVEL.toss;
+      const mixP = (p, q, t) => [v3.lerp(p[0], q[0], t), v3.lerp(p[1], q[1], t)];
+      if (c < 0.22) { shovel.f = lerpA(shovel.f, fPile, Math.min(1, dt * 10)); shovel.pose = mixP(SHOVEL.rest, A, smooth(Math.min(1, c / 0.1))); }
+      else if (c < 0.38) { shovel.f = fPile; shovel.pose = mixP(A, B, smooth((c - 0.22) / 0.16)); }
+      else if (c < 0.6) { shovel.f = lerpA(fPile, fBar, smooth((c - 0.38) / 0.22)); shovel.pose = B; }
+      else if (c < 0.72) { shovel.f = fBar; shovel.pose = mixP(B, T, smooth((c - 0.6) / 0.12)); }
+      else { shovel.f = lerpA(fBar, fPile, smooth((c - 0.72) / 0.28)); shovel.pose = mixP(T, A, smooth((c - 0.72) / 0.28)); }
+    } else {
+      turnTo(shovel, rad(-60), dt, 1.5);
+      shovel.pose = [v3.lerp(shovel.pose[0], SHOVEL.rest[0], Math.min(1, dt * 4)), v3.lerp(shovel.pose[1], SHOVEL.rest[1], Math.min(1, dt * 4))];
+    }
+
+    runRoute(carrier, dt);
+
+    // signalmen follow their crane's job
+    for (const p of signals) {
+      const k = p.k, b = k.job;
+      p.t += dt;
+      let to = p.k.home, look = [k.x + k.r * Math.cos(k.th), k.y + k.r * Math.sin(k.th)];
+      if (b && b.state === "ground") { to = [b.x + 3, b.y + 17]; look = [b.x, b.y]; }
+      else if (b) { to = [b.slot.cx + 3, 30]; look = [b.slot.cx, b.slot.cy]; }
+      const there = walkTo(p, to[0], to[1], dt);
+      if (there) turnTo(p, toward(p, look), dt, 4);
+      const want = there && k.cur && k.cur.low && b ? 1 : 0;
+      p.raise += (want - p.raise) * Math.min(1, dt * 5);
+      p.cheer += ((phase === "fixed" ? 1 : 0) - p.cheer) * Math.min(1, dt * 5);
+    }
+
+    // the manager turns to whatever is being set down and points at it
+    const busy = cranes.find((k) => k.cur && k.cur.low && k.job);
+    if (busy) boss.target = [busy.x + busy.r * Math.cos(busy.th) + busy.sx, busy.y + busy.r * Math.sin(busy.th) + busy.sy, busy.h];
+    boss.pw += ((busy || phase === "fixed" ? 1 : 0) - boss.pw) * Math.min(1, dt * 3);
+    if (phase === "fixed") boss.target = [boss.x, boss.y - 2, 60];
+    const look = busy ? toward(boss, boss.target) : boss.home;
+    turnTo(boss, boss.home + clamp(wrap(look - boss.home), -1, 1), dt, 1.2);
+
+    // the onlooker follows the right crane's hook
+    const rk = cranes[1];
+    turnTo(watcher, toward(watcher, [rk.x + rk.r * Math.cos(rk.th), rk.y + rk.r * Math.sin(rk.th)]), dt, 0.8);
+
+    for (const p of people) p.amp += ((p.moving ? 1 : 0) - p.amp) * Math.min(1, dt * 7);
+  }
+
+  function sim(dt) {
+    clock += dt;
+    director(dt);
+    for (const k of cranes) { craneStep(k, dt); swing(k, dt); }
+    for (const s of broken) if (s.block.state === "falling") fall(s.block, dt);
+    updatePeople(dt);
+    mixer.spin += dt * 1.6;
+    for (let i = debris.length - 1; i >= 0; i--) {
+      const d = debris[i];
+      d.life += dt;
+      if (d.z > 0 || d.vz > 0) { d.vz -= 120 * dt; d.x += d.vx * dt; d.y += d.vy * dt; d.z = Math.max(0, d.z + d.vz * dt); if (d.z === 0) { d.vz = 0; d.vx = d.vy = 0; } }
+      if (d.life > 1.6) { d.el.remove(); debris.splice(i, 1); }
+    }
+  }
+
+  function draw() {
+    const shaking = phase === "shake", lit = phase === "fixed";
+    for (const b of blocks) {
+      const dx = shaking && b.state === "slot" ? Math.sin(pt * 70 + b.slot.col * 1.7) * 0.9 * (1 - pt / 0.8) : 0;
+      const w = pt - 0.2 - b.slot.col * 0.06, dz = lit && w > 0 && w < 0.5 ? 3.2 * Math.sin((w / 0.5) * Math.PI) : 0;
+      drawBlock(b, dx, dz);
+      flag(b.el.sil, "hi", b.state !== "ground");
+    }
+    for (const c of cracks) setD(c.on.crack, c.gap.block.state === "slot" ? "" : c.d);
+    for (const g of ghosts) setD(g.el, g.s.block.state === "slot" ? "" : g.d);
+    for (const k of cranes) drawCrane(k);
+    for (const p of people) drawPerson(p);
+    drawBarrow(barrow);
+    mixer.draw();
+    for (const d of debris) { place(d.el, P(d.x, d.y, d.z)); flag(d.el, "off", d.life > 0.9); }
+    // repaint in depth order, only when the order changed
+    let sorted = true;
+    for (let i = 1; i < items.length; i++) if (items[i].key < items[i - 1].key) { sorted = false; break; }
+    if (!sorted) { items.sort((a, b) => a.key - b.key); for (const it of items) layer.appendChild(it.g); }
+    const text = phase === "fixed" ? "fixed" : phase === "shake" || phase === "break" ? "breaking" : `fixing ${placedCount()}/${broken.length}`;
+    if (text !== read) { read = text; onRead(text); }
+  }
+
+  // ---------------------------------------------------------------- life
+  const advance = (sec) => { let left = sec; while (left > 1e-6) { const h = Math.min(left, 1 / 90); sim(h); left -= h; } };
+  let rate = 1, rateT = 1;
+  advance(Math.max(0, opts.t || 0));
+  const still = () => opts.freeze || reducedMotion();
+  if (reducedMotion() && !opts.t) advance(8.6); // a still with both cranes at work
+  const B = register(stage, (dt) => {
+    if (still()) { draw(); return false; }
+    rate += (rateT - rate) * Math.min(1, dt * 4);
+    advance(dt * rate);
+    draw();
+    return true;
+  });
+  bag.add(B.unregister);
+  // hovering slows the site down, so a lift can be followed
+  bag.on(stage, "pointerenter", (e) => { if (e.pointerType === "mouse") { rateT = 0.35; B.wake(); } });
+  bag.on(stage, "pointerleave", () => { rateT = 1; B.wake(); });
+  bag.add(() => svg.replaceChildren());
+
+  return { destroy: bag.dispose, time: () => clock };
+}
+</script>
+<script>
+  (() => {
+    const $ = (id) => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    if (["light", "dark"].includes(params.get("theme"))) document.documentElement.dataset.theme = params.get("theme");
+
+    const path = location.pathname;
+    $("path").textContent = path && path !== "/" && path.length < 40 ? path : "/this-page";
+
+    HL.inject(document);
+    const stage = $("stage");
+    const svg = HL.mk("svg", { viewBox: "0 0 800 450", "aria-hidden": "true" }, stage);
+    construction404(stage, svg, {
+      t: Number(params.get("t")) || 0,
+      freeze: params.has("freeze"),
+      onRead: (text) => { $("read").textContent = text; $("status").textContent = text; },
+    });
+  })();
+</script>
+</body>
+</html>

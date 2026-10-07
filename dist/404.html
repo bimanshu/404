@@ -902,99 +902,721 @@ function siteCore(svg, opts) {
   return { Cam, proj, fit, rrect, circ, prism, ringAt, run, hull, poly, open, seg, clamp, lerp, rad, r2, mk, solid, place, spring, stepS, reducedMotion, VW, VH, AZ, K, CORE, sA, cA, ZF, VIEW, depth, front, TAU, wrap, smooth, lerpA, SZ, SD, PITCH, SL, SAFE, HOOK_GROUND, JIB, GROUND, CRANES, PILE, MIXER, PALLET, LOAD, DUMP, BOSS, slots, slotAt, broken, C, P, S, P3, defs, ground, shadows, layer, tops, items, item, setD, flag, putC, rring, rbox, moved, v3, frame, hash, RIGHT, LIGHT, toneOf, facesRight, boxFaces, shadedBox, putBox, makeShadow, story, still };
 }
 
-/** The ground: the slab, the sand pile, the bag pallet, the cones and the mixer. */
+/**
+ * The ground: the slab and the marks on it, the hoarding round the back and both sides, and the busy
+ * site inside: the raised block yard by the left gate, the stock along the back hoarding, the skip and
+ * the scaffold, the right wing round the mixer, and the sand pile, the bag pallet, the cones and the
+ * mixer the crew work at. All of it is drawn once; only the mixer's drum moves, and only the items'
+ * keys take part in the depth sort.
+ */
 function siteGround(ctx) {
   const {
-    rrect, circ, prism, ringAt, run, hull, poly, open, seg, rad, mk, solid, sA, cA, VIEW, depth, front, TAU, GROUND,
-    PILE, MIXER, PALLET, P, P3, ground, layer, item, setD, putC, rbox, moved, v3,
+    rrect, circ, run, hull, poly, open, lerp, rad, mk, sA, cA, VIEW, depth, front, TAU, GROUND,
+    PILE, MIXER, PALLET, P, P3, ground, layer, item, setD, rring, moved, v3, hash, toneOf, facesRight, boxFaces, makeShadow,
   } = ctx;
 
-  // ---------------------------------------------------------------- ground and props
+  // ---------------------------------------------------------------- drawing helpers
+  /** Box tones, [shade, lit side, top]: stone and steel read darker, timber and white panels lighter. */
+  const STONE = ["t2", "t3", "t5"], TIMBER = ["t3", "t4", "t6"], STEEL = ["t1", "t2", "t4"], WHITE = ["t3", "t5", "t6"];
+  const path = (g, cls, d) => (d ? mk("path", { class: cls, d }, g) : null);
+  /**
+   * While flat is set, a new group lies on the ground layer, in the order made, with its shadow under it, and stays out of the
+   * depth sort: for what nothing that moves ever passes in front of or behind.
+   */
+  let flat = null;
+  const group = (key) => { const g = mk("g", {}, flat ? flat.props : layer); if (!flat) item(g, key); return g; };
+  const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
+  const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
+  /** Local to screen on a frame turned by th about (x, y): u along th, v to its left, z up. */
+  const onto = (x, y, th) => { const c = Math.cos(th), s = Math.sin(th); return (u, v, z) => P(x + u * c - v * s, y + u * s + v * c, z); };
+  /** Open polylines through local points, one subpath each. */
+  const lines = (W, ...ls) => ls.map((l) => open(l.map((p) => W(p[0], p[1], p[2])))).join("");
+  const quad = (W, ...ps) => poly(ps.map((p) => W(p[0], p[1], p[2])));
+  /** Whether an upright face with this outward normal faces the viewer. */
+  const sees = (nx, ny) => nx * sA + ny * cA > 0.03;
+  /** The end (a u) and the side (a v) of a box turned by th that face the viewer, or null when turned away. */
+  function seen(th, u0, v0, u1, v1) {
+    const c = Math.cos(th), s = Math.sin(th);
+    return [sees(c, s) ? u1 : sees(-c, -s) ? u0 : null, sees(-s, c) ? v1 : sees(s, -c) ? v0 : null];
+  }
+  /** A shaded box: its shade, lit side and top as fills, its outline, and a crease b inside the top when asked. */
+  function box(g, x, y, th, u0, v0, u1, v1, z0, z1, tones = STONE, r = 0.35, b = 0) {
+    const inner = b ? rring(x, y, th, u0 + b, v0 + b, u1 - b, v1 - b, Math.max(0.2, r - b), 2) : null;
+    const f = boxFaces(rring(x, y, th, u0, v0, u1, v1, r, 2), z0, z1, inner);
+    path(g, "fo " + tones[0], f.sil); path(g, "fo " + tones[1], f.left); path(g, "fo " + tones[2], f.top); path(g, "nf sil", f.sil);
+    if (b) path(g, "nf", f.crease);
+    return f;
+  }
+  /** Small boxes that never overlap on screen, merged by tone: four paths however many. q = [x, y, th, u0, v0, u1, v1, z0, z1]. */
+  function boxes(g, list, tones = STONE) {
+    const d = ["", "", ""];
+    for (const q of list) { const f = boxFaces(rring(q[0], q[1], q[2], q[3], q[4], q[5], q[6], 0.25, 1), q[7], q[8]); d[0] += f.sil; d[1] += f.left; d[2] += f.top; }
+    path(g, "fo " + tones[0], d[0]); path(g, "fo " + tones[1], d[1]); path(g, "fo " + tones[2], d[2]); path(g, "nf sil", d[0]);
+  }
+  /** A soft contact shadow, on the ground or (z) on the pad: radii rx, ry about (x, y) turned by th, strength k. */
+  function shadow(x, y, rx, ry, th = 0, k = 0.42, z = 0, parent) {
+    const s = makeShadow(parent || (flat ? flat.shade : undefined));
+    s.set(x, y, rx, ry, th, k);
+    if (z) {
+      const c = Math.cos(th), sn = Math.sin(th), pts = [];
+      for (let i = 0; i < 20; i++) { const a = (i / 20) * TAU, u = rx * Math.cos(a), v = ry * Math.sin(a); pts.push(P(x + u * c - v * sn, y + u * sn + v * c, z)); }
+      setD(s.el, poly(pts));
+    }
+    return s;
+  }
+  /** The shadow under a footprint w by d, a little away from the light. */
+  const under = (x, y, th, w, d, z = 0, k = 0.42) => shadow(x + 0.7, y - 0.25, w * 0.62 + 1.8, d * 0.62 + 2, th, k, z);
+
+  /**
+   * The faces between two rings of world points sampled alike round a body (A below, B above), in runs
+   * of one tone by their normals: { t3: d, ... }. Faces turned away are left out; shift darkens.
+   */
+  function toneRuns(A, B, shift = 0, out = {}) {
+    const n = A.length;
+    const tone = (i) => {
+      const q = v3.norm(cross(v3.sub(A[(i + 1) % n], A[i]), v3.sub(B[i], A[i])));
+      return dot(q, VIEW) > 0 ? "t" + Math.max(1, +toneOf(q).slice(1) - shift) : null;
+    };
+    let s = 0;
+    while (s < n && tone(s)) s++;
+    let cur = null, a = [], b = [];
+    const flush = () => { if (cur && a.length > 1) out[cur] = (out[cur] || "") + poly(a.concat(b.reverse())); a = []; b = []; };
+    for (let k = 0; k < n; k++) {
+      const i = (s + k) % n, j = (i + 1) % n, t = tone(i);
+      if (t !== cur) { flush(); cur = t; }
+      if (t) { if (!a.length) { a.push(P3(A[i])); b.push(P3(B[i])); } a.push(P3(A[j])); b.push(P3(B[j])); }
+    }
+    flush();
+    return out;
+  }
+  const paint = (g, runs) => { for (const t of ["t1", "t2", "t3", "t4", "t5", "t6"]) path(g, "fo " + t, runs[t]); };
+  /** An upright body of revolution at (x, y), profile [[r, z], ...] from the foot up: shade, tone bands and a top cap. Returns its outline. */
+  function lathe(g, x, y, prof, shift = 0, n = 24) {
+    const rings = prof.map(([r, z]) => Array.from({ length: n }, (_, i) => [x + r * Math.cos((i / n) * TAU), y + r * Math.sin((i / n) * TAU), z]));
+    const runs = {};
+    for (let k = 0; k + 1 < rings.length; k++) toneRuns(rings[k], rings[k + 1], shift, runs);
+    const sil = poly(hull(rings.flat().map(P3)));
+    path(g, "fo " + (Object.keys(runs).sort()[0] || "t2"), sil);
+    paint(g, runs);
+    path(g, "fo t" + Math.max(1, 5 - shift), poly(rings[rings.length - 1].map(P3)));
+    return sil;
+  }
+  /** The arc of a ring at height z that faces the viewer. */
+  const arc = (x, y, r, z, n = 24) => open(run(moved(circ(r, n), x, y), front).map((q) => P(q.u, q.v, z)));
+
+  // ---------------------------------------------------------------- the slab and the marks on it
+  const PAD = { x0: -117, y0: -14, x1: -80, y1: 74, h: 2.5 };
   {
     const [x0, y0, x1, y1] = GROUND;
     const outer = rrect(x0, y0, x1, y1, 36, 14), inner = rrect(x0 + 2.4, y0 + 2.4, x1 - 2.4, y1 - 2.4, 33.6, 14);
-    putC(solid(ground), prism(P, front, outer, inner, -6, 0));
-  }
-
-  function sandPile([x, y]) {
-    const g = mk("g", {}, layer), foot = [], top = [];
-    for (let i = 0; i < 32; i++) {
-      const a = (i / 32) * TAU, w = 1 + 0.07 * Math.sin(a * 3 + 1);
-      foot.push(P(x + 17 * w * Math.cos(a), y + 14 * w * Math.sin(a), 0));
-      top.push(P(x - 3 + 4.5 * Math.cos(a), y - 1 + 3.5 * Math.sin(a), 12.5));
+    // a soft drop shadow under the slab: long soft bands along the edges we see, a little to the right of the light
+    for (const [sx, sy, rx, ry, deg, k] of [[92, y1 + 1.5, 236, 9, 0, 0.42], [x1 - 1, 48, 96, 4.6, 90, 0.36], [x1 - 21, y1 - 17, 34, 6.5, -45, 0.32], [x0 + 24, y1 - 13, 34, 8, 45, 0.24]]) {
+      shadow(sx + 3, sy, rx, ry, rad(deg), k, -7, ground);
     }
-    mk("path", { class: "sil", d: poly(hull(foot.concat(top))) }, g);
-    mk("path", { class: "nf lo", d: open([P(x - 1, y + 2, 11.5), P(x + 2, y + 7, 6.5), P(x + 6, y + 12.5, 0.6)]) + open([P(x - 6, y + 2, 10.5), P(x - 8, y + 8, 5), P(x - 11, y + 12, 0.6)]) }, g);
-    item(g, depth(x, y));
+    const f = boxFaces(outer, -6, 0, inner);
+    path(ground, "fo t2", f.right); path(ground, "fo t3", f.left); path(ground, "fo", f.top); path(ground, "nf sil", f.sil); path(ground, "nf lo", f.crease);
+
+    // saw-cut joints: across the slab between the digits, and along it behind the landing area and the barrow lane
+    let d = "";
+    for (const x of [-42, 55, 118, 212]) d += open([P(x, -39, 0), P(x, 133, 0)]);
+    d += open([P(-119, 30, 0), P(293, 30, 0)]) + open([P(-121, 104, 0), P(293, 104, 0)]);
+    path(ground, "nf lo", d);
+
+    // a wet patch where the mixer is washed out, and sand spilled where the barrow is loaded
+    shadow(252, 64, 9, 4.5, rad(-30), 0.12, 0, ground);
+    let grit = "";
+    for (let i = 0; i < 26; i++) {
+      const a = hash(i + 7) * TAU, r = Math.sqrt(hash(i + 31)), x = -18 + 9 * r * Math.cos(a), y = 113 + 4 * r * Math.sin(a), d = 0.35 + 0.4 * hash(i + 57);
+      grit += open([P(x - d, y, 0), P(x + d, y + d * 0.4, 0)]);
+    }
+    path(ground, "nf lo", grit);
+
+    // the worn barrow lane, from the sand pile to the mixer
+    path(ground, "nf lo dash", open([P(-21, 116, 0), P(-6, 116, 0), P(120, 120, 0), P(234, 80, 0), P(248, 75, 0)]));
+
+    // rebar mesh laid for the next pour, on its chairs
+    let m = "";
+    for (let i = 0; i <= 10; i++) { const x = 236 + i * 2.8; m += open([P(x, 107, 0.4), P(x, 129, 0.4)]); }
+    for (let j = 0; j <= 7; j++) { const y = 108 + (j * 20) / 7; m += open([P(235, y, 0.4), P(265, y, 0.4)]); }
+    for (const [x, y] of [[240.2, 111], [259.8, 111], [240.2, 125], [259.8, 125]]) m += open([P(x - 0.7, y, 0), P(x, y, 0.4), P(x + 0.7, y, 0)]);
+    path(ground, "nf", m);
+
+    // the stock yard's raised pad
+    const pr = rrect(PAD.x0, PAD.y0, PAD.x1, PAD.y1, 4, 4);
+    const pf = boxFaces(pr, 0, PAD.h, rrect(PAD.x0 + 0.9, PAD.y0 + 0.9, PAD.x1 - 0.9, PAD.y1 - 0.9, 3.1, 4));
+    path(ground, "fo t2", pf.sil); path(ground, "fo t3", pf.left); path(ground, "fo t5", pf.top); path(ground, "nf sil", pf.sil); path(ground, "nf lo", pf.crease);
   }
 
+  // ---------------------------------------------------------------- the hoarding
+  const FH = 22, FT = 0.6, MID = [88, 45];
+  /**
+   * White hoarding along a chain of points, panels about 16 long: the face we see toned by its normal
+   * (never darker than t2), the capping rail's top, the panel joints, the capping crease and the kicker
+   * line, and a concrete foot at every joint on the side we see.
+   */
+  function hoarding(g, pts) {
+    const faces = {}, top = [], sil = [], ln = [], feet = [];
+    for (let i = 0; i + 1 < pts.length; i++) {
+      const [ax, ay] = pts[i], [bx, by] = pts[i + 1], L = Math.hypot(bx - ax, by - ay), tx = (bx - ax) / L, ty = (by - ay) / L;
+      let nx = -ty, ny = tx;
+      if (nx * (MID[0] - ax) + ny * (MID[1] - ay) < 0) nx = -nx, ny = -ny;
+      if (!sees(nx, ny)) nx = -nx, ny = -ny;
+      const W = (s, o, z) => P(ax + tx * s + nx * o, ay + ty * s + ny * o, z), h = FT / 2;
+      const t = "t" + Math.max(2, +toneOf([nx, ny, 0]).slice(1));
+      faces[t] = (faces[t] || "") + poly([W(0, h, 0), W(L, h, 0), W(L, h, FH), W(0, h, FH)]);
+      top.push(poly([W(0, -h, FH), W(L, -h, FH), W(L, h, FH), W(0, h, FH)]));
+      sil.push(poly(hull([0, L].flatMap((s) => [-h, h].flatMap((o) => [W(s, o, 0), W(s, o, FH)])))));
+      ln.push(open([W(0, h, FH - 0.9), W(L, h, FH - 0.9)]), open([W(0, h, 1.6), W(L, h, 1.6)]));
+      const n = Math.max(1, Math.round(L / 16)), f = Math.atan2(ny, nx);
+      for (let k = 0; k <= n; k++) {
+        const s = (L * k) / n;
+        if (k > 0 && k < n) ln.push(open([W(s, h, 0.3), W(s, h, FH - 0.3)]));
+        if (k < n || i === pts.length - 2) feet.push([ax + tx * s, ay + ty * s, f, h, -1, 3.2, 1, 0, 1.5]);
+      }
+    }
+    for (const t in faces) path(g, "fo " + t, faces[t]);
+    path(g, "fo t6", top.join("")); path(g, "nf", ln.join("")); path(g, "nf sil", sil.join(""));
+    boxes(g, feet, STONE);
+  }
+  /** A gate post with its cap. */
+  const post = (g, x, y) => { box(g, x, y, 0, -1.3, -1.3, 1.3, 1.3, 0, 26, WHITE, 0.3); box(g, x, y, 0, -1.7, -1.7, 1.7, 1.7, 26, 26.9, STONE, 0.3); };
+  /** Round the back, from the left gate to the right side: it stands behind everything inside. */
+  function backHoarding() {
+    const g = group(-1e4);
+    shadow(-117.5, 45, 56, 4.5, rad(90), 0.3);
+    shadow(88, -40.5, 180, 3, 0, 0.2);
+    hoarding(g, [[-122, 100], [-122, -10], [-117.6, -26.5], [-105.5, -38.6], [-89, -43], [264, -43], [280.5, -38.6], [292.6, -26.5], [297, -10]]);
+    post(g, -122, 100);
+  }
+  /** The right side, seen from outside, in two halves so what stands near it inside paints first; the site board on the far half, the gate post on the near one. */
+  function sideHoarding(near) {
+    const g = group(depth(297, near ? 42.5 : 7.5) + 6);
+    hoarding(g, near ? [[297, 25], [297, 60]] : [[297, -10], [297, 25]]);
+    if (near) return post(g, 297, 60);
+    const S = (y, z) => P(297.8, y, z), board = poly([S(22, 6), S(4, 6), S(4, 17), S(22, 17)]);
+    path(g, "fo t4", board);
+    path(g, "fo t1", poly([S(22, 14.4), S(4, 14.4), S(4, 17), S(22, 17)]) + poly([S(8.6, 7.4), S(5.4, 7.4), S(5.4, 10.6), S(8.6, 10.6)]));
+    path(g, "nf", [[12.6, 15], [11.2, 12], [9.4, 13]].map(([w, z], i) => open([S(20.6, z - i * 1.5 - 0.5), S(20.6 - w, z - i * 1.5 - 0.5)])).join("") + open([S(20.6, 7.6), S(13, 7.6)]));
+    path(g, "nf sil", board);
+  }
+
+  // ---------------------------------------------------------------- the stock
+  /** A slatted pallet, half sizes U by V and 2 high: the fork gaps dark between its runner blocks, board lines. Returns [lines, gaps]. */
+  function pallet(g, x, y, th, z0, U, V, tones = TIMBER) {
+    const W = onto(x, y, th), [eu, ev] = seen(th, -U, -V, U, V), lo = z0 + 0.45, hi = z0 + 1.55;
+    // it is low and mostly under its load: one filled outline in its side tone
+    path(g, "sil " + tones[0], boxFaces(rring(x, y, th, -U, -V, U, V, 0.2, 2), z0, z0 + 2).sil);
+    let gap = "", ln = "";
+    if (ev !== null) {
+      for (const [a, b] of [[-U + 2, -1], [1, U - 2]]) gap += quad(W, [a, ev, lo], [b, ev, lo], [b, ev, hi], [a, ev, hi]);
+      ln += lines(W, [[-U, ev, lo], [U, ev, lo]], [[-U, ev, hi], [U, ev, hi]]);
+    }
+    if (eu !== null) {
+      for (const [a, b] of [[-V + 1.6, -0.8], [0.8, V - 1.6]]) gap += quad(W, [eu, a, lo], [eu, b, lo], [eu, b, hi], [eu, a, hi]);
+      ln += lines(W, [[eu, -V, lo], [eu, V, lo]], [[eu, -V, hi], [eu, V, hi]]);
+      for (let k = 1; k < 5; k++) { const v = -V + (2 * V * k) / 5; ln += lines(W, [[eu, v, hi], [eu, v, z0 + 2]]); }
+    }
+    return [ln, gap];
+  }
+  const CH = 3.2;
+  /** Two hollow cores on the top of a block, along its longer side. */
+  function cores(x, y, th, cu, cv, hu, hv, z) {
+    const long = hv > hu, d = [];
+    for (const s of [-1, 1]) {
+      const ou = long ? 0 : (s * hu) / 2, ov = long ? (s * hv) / 2 : 0, a = long ? hu * 0.5 : hu * 0.32, b = long ? hv * 0.32 : hv * 0.5;
+      const W = onto(x, y, th), u = cu + ou, v = cv + ov;
+      d.push(quad(W, [u - a, v - b, z], [u + a, v - b, z], [u + a, v + b, z], [u - a, v + b, z]));
+    }
+    return d.join("");
+  }
+  /**
+   * A pallet of blocks: a slatted pallet with three courses of blocks on it, staggered joints on the
+   * faces we see and the top, hollow cores on top, two straps. two stacks a second one, a little askew;
+   * used leaves the top course on the back half only, its straps cut and one end hanging.
+   */
+  function blockPallet(x, y, deg, z0, o = {}) {
+    const g = group(depth(x, y)), U = 7.5, V = 6, u = U - 0.4, v = V - 0.4;
+    under(x, y, rad(deg), 15, 12, z0);
+    for (let L = 0; L < (o.two ? 2 : 1); L++) {
+      const X = x + L * 0.5, Y = y + L * 0.3, th = rad(deg + L * 2), Z = z0 + L * (2 + 3 * CH), W = onto(X, Y, th);
+      let [ln, cd] = pallet(g, X, Y, th, Z, U, V);
+      const s0 = Z + 2, top = s0 + 3 * CH, cut = o.used && L === (o.two ? 1 : 0), [eu, ev] = seen(th, -u, -v, u, v);
+      const back = ev === -v ? [0, v] : [-v, 0], fv = cut ? (ev === null ? null : back[ev === v ? 1 : 0]) : ev;
+      if (cut) { box(g, X, Y, th, -u, -v, u, v, s0, s0 + 2 * CH); box(g, X, Y, th, -u, back[0], u, back[1], s0 + 2 * CH, top); }
+      else box(g, X, Y, th, -u, -v, u, v, s0, top);
+      // courses and head joints on the faces we see
+      for (let k = 0; k < 3; k++) {
+        const za = s0 + k * CH, zb = za + CH, top3 = k === 2 && cut, sv = top3 ? fv : ev;
+        if (k > 0 && !(cut && k === 2)) { if (ev !== null) ln += lines(W, [[-u, ev, za], [u, ev, za]]); if (eu !== null) ln += lines(W, [[eu, -v, za], [eu, v, za]]); }
+        if (sv !== null) for (const ju of k % 2 ? [0] : [-u / 3, u / 3]) ln += lines(W, [[ju, sv, za], [ju, sv, zb]]);
+        if (eu !== null) for (const jv of k % 2 ? [-v / 3, v / 3] : [0]) if (!top3 || (jv > back[0] && jv < back[1])) ln += lines(W, [[eu, jv, za], [eu, jv, zb]]);
+      }
+      // the top: the joints of the top course and its cores; where it is used, the course below shows
+      const [va, vb] = cut ? back : [-v, v];
+      for (const ju of [-u / 3, u / 3]) ln += lines(W, [[ju, va, top], [ju, vb, top]]);
+      if (!cut) ln += lines(W, [[-u, 0, top], [u, 0, top]]);
+      for (const cu of [(-2 * u) / 3, 0, (2 * u) / 3]) for (const cv of [-v / 2, v / 2]) if (cv > va && cv < vb) cd += cores(X, Y, th, cu, cv, u / 3, v / 2, top);
+      if (cut) {
+        const fr = back[0] === 0 ? [-v, 0] : [0, v], jv = back[0] === 0 ? -v / 3 : v / 3, zc = s0 + 2 * CH;
+        ln += lines(W, [[0, fr[0], zc], [0, fr[1], zc]], [[-u, jv, zc], [u, jv, zc]]);
+        for (const cu of [-u / 2, u / 2]) for (const cv of back[0] === 0 ? [-2 * v / 3] : [2 * v / 3]) cd += cores(X, Y, th, cu, cv, u / 2, v / 3, zc);
+        if (ev !== null) { const su = u * 0.55; ln += lines(W, [[su, ev, zc], [su + 0.5, ev, zc - 1.4], [su - 0.2, ev, zc - 2.6], [su + 0.3, ev, zc - 3.4]]); }
+      } else {
+        for (const su of [-u * 0.55, u * 0.55]) { ln += lines(W, [[su, -v, top], [su, v, top]]); if (ev !== null) ln += lines(W, [[su, ev, top], [su, ev, s0]]); }
+      }
+      path(g, "fo t1", cd);
+      path(g, "nf", ln);
+    }
+  }
+  /** Loose blocks: [u, v, yaw, z] in the item's frame, each L by D by H with its cores on top; drawn far to near. */
+  function looseBlocks(x, y, deg, z0, list, L, D, H = 3.2) {
+    const g = group(depth(x, y)), th = rad(deg), c = Math.cos(th), s = Math.sin(th);
+    under(x, y, th, 11, 7, z0, 0.38);
+    const at = list.map(([u, v, yaw, z]) => ({ x: x + u * c - v * s, y: y + u * s + v * c, th: th + rad(yaw), z: z0 + z }));
+    at.sort((a, b) => a.z - b.z || depth(a.x, a.y) - depth(b.x, b.y));
+    for (const b of at) {
+      box(g, b.x, b.y, b.th, -L / 2, -D / 2, L / 2, D / 2, b.z, b.z + H, STONE, 0.3);
+      path(g, "fo t1", cores(b.x, b.y, b.th, 0, 0, L / 2, D / 2, b.z + H));
+    }
+  }
+  /** Bearers under a load: small timber boxes across it at the given u. */
+  const bearers = (g, x, y, th, us, half, z0, h) => boxes(g, us.map((u) => [x, y, th, u - 0.8, -half, u + 0.8, half, z0, z0 + h]), TIMBER);
+  /** A bundle of planks on three bearers: the plank ends a staggered grid on the end we see, layer lines along the side, two steel straps. */
+  function timber(x, y, deg, z0, L, D, H, layers = 3, planks = 4) {
+    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), [eu, ev] = seen(th, -L / 2, -D / 2, L / 2, D / 2), b = z0 + 1.5, top = b + H;
+    under(x, y, th, L, D, z0);
+    bearers(g, x, y, th, [-L / 2 + 3, 0, L / 2 - 3], D / 2 + 0.7, z0, 1.5);
+    box(g, x, y, th, -L / 2, -D / 2, L / 2, D / 2, b, top, TIMBER, 0.2);
+    let ln = "";
+    for (let k = 1; k < layers; k++) {
+      const z = b + (H * k) / layers;
+      if (ev !== null) ln += lines(W, [[-L / 2, ev, z], [L / 2, ev, z]]);
+      if (eu !== null) ln += lines(W, [[eu, -D / 2, z], [eu, D / 2, z]]);
+    }
+    if (eu !== null) for (let k = 0; k < layers; k++) {
+      const za = b + (H * k) / layers, zb = b + (H * (k + 1)) / layers, off = k % 2 ? 0.5 : 0;
+      for (let p = 1; p < planks + 1; p++) { const v = -D / 2 + (D * (p - off)) / planks; if (v > -D / 2 + 0.4 && v < D / 2 - 0.4) ln += lines(W, [[eu, v, za], [eu, v, zb]]); }
+    }
+    let st = "";
+    for (const su of [-L * 0.28, L * 0.28]) { st += lines(W, [[su, -D / 2, top], [su, D / 2, top]]); if (ev !== null) st += lines(W, [[su, ev, top], [su, ev, b]]); }
+    path(g, "nf", ln); path(g, "nf sil", st);
+  }
+  /** Bundles of bar on timber bearers: bars along the top and side, their ends as small rings on the end we see, a few standing proud, wire ties. */
+  function rebar(x, y, deg, L, D, H, n = 1, nb = 3) {
+    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), b = 1.5, top = b + H, span = n * D + (n - 1);
+    const [eu, ev] = seen(th, -L / 2, -span / 2, L / 2, span / 2);
+    under(x, y, th, L, span);
+    bearers(g, x, y, th, nb === 3 ? [-L / 2 + 3, 0, L / 2 - 3] : [-L / 2 + 4, L / 2 - 4], span / 2 + 0.8, 0, b);
+    const order = Array.from({ length: n }, (_, j) => -span / 2 + D / 2 + j * (D + 1));
+    if (ev !== null && ev < 0) order.reverse();
+    for (const vc of order) {
+      box(g, x, y, th, -L / 2, vc - D / 2, L / 2, vc + D / 2, b, top, STEEL, 1);
+      let ln = "", ends = "";
+      for (const f of [-0.28, 0, 0.28]) ln += lines(W, [[-L / 2 + 0.8, vc + f * D, top], [L / 2 - 0.8, vc + f * D, top]]);
+      const sv = ev === null ? null : vc + Math.sign(ev) * D / 2;
+      if (sv !== null) for (const f of [0.35, 0.7]) ln += lines(W, [[-L / 2 + 0.8, sv, b + f * H], [L / 2 - 0.8, sv, b + f * H]]);
+      if (eu !== null) {
+        for (const zf of [0.3, 0.72]) for (const vf of [-0.36, -0.12, 0.12, 0.36]) {
+          const pts = [];
+          for (let i = 0; i < 8; i++) { const a = (i / 8) * TAU; pts.push(W(eu, vc + vf * D + 0.32 * Math.cos(a), b + zf * H + 0.32 * Math.sin(a))); }
+          ends += poly(pts);
+        }
+        const out = Math.sign(eu);
+        for (const [vf, zf, k] of [[-0.24, 0.72, 1.6], [0.12, 0.3, 0.9], [0.36, 0.72, 2.3]]) ln += lines(W, [[eu, vc + vf * D, b + zf * H], [eu + out * k, vc + vf * D, b + zf * H]]);
+      }
+      for (const tu of [-L * 0.24, L * 0.26]) { ln += lines(W, [[tu, vc - D / 2, top], [tu, vc + D / 2, top]]); if (sv !== null) ln += lines(W, [[tu, sv, top], [tu, sv, b], [tu + 0.6, sv + Math.sign(ev) * 0.6, b + 0.4]]); }
+      path(g, "nf sil", ln); path(g, "nf", ends);
+    }
+  }
+  /** Three planks: two lying side by side and a third across them, just pulled from the bundle. */
+  function planks(x, y, deg) {
+    const g = group(depth(x, y)), th = rad(deg), c = Math.cos(th), s = Math.sin(th);
+    under(x, y, th, 22, 7, 0, 0.32);
+    for (const v of [-1.7, 1.7]) box(g, x - v * s, y + v * c, th, -11, -1.1, 11, 1.1, 0, 0.8, TIMBER, 0.1);
+    box(g, x + 1.5 * c, y + 1.5 * s, th + rad(20), -11, -1.1, 11, 1.1, 0.8, 1.6, TIMBER, 0.1);
+  }
+
+  // ---------------------------------------------------------------- the back strip and its corners
+  /** A scaffold bay: two lifts with board decks, end frames, ledgers, cross braces on the far face, guard rails and a toe board. */
+  function scaffoldBay(x, y, deg) {
+    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), U = 7, V = 4, L1 = 14, L2 = 28, R1 = 31, R2 = 34;
+    const [eu, ev] = seen(th, -U, -V, U, V), fu = eu === null ? -U : eu, fv = ev === null ? V : ev, bu = -fu, bv = -fv;
+    under(x, y, th, 14, 8, 0, 0.4);
+    boxes(g, [-U, U].map((u) => [x, y, th, u - 0.8, -V - 1.3, u + 0.8, V + 1.3, 0, 0.6]), TIMBER);
+    const tube = (...ls) => lines(W, ...ls);
+    let far = tube([[-U, bv, 0.6], [-U, bv, R2]], [[U, bv, 0.6], [U, bv, R2]], [[bu, fv, 0.6], [bu, fv, R2]]);
+    for (const z of [L1, L2]) far += tube([[-U, bv, z], [U, bv, z]], [[bu, -V, z], [bu, V, z]]);
+    for (const [za, zb] of [[0.6, L1], [L1, L2]]) far += tube([[-U, bv, za], [U, bv, zb]], [[U, bv, za], [-U, bv, zb]]);
+    far += tube([[bu, -V, 0.6], [bu, V, L1]], [[bu, -V, L1], [bu, V, L2]], [[bu, -V, R1], [bu, V, R1]], [[bu, -V, R2], [bu, V, R2]]);
+    path(g, "nf", far);
+    for (const z of [L1, L2]) {
+      box(g, x, y, th, -U, -V, U, V, z - 0.8, z, TIMBER, 0.1);
+      path(g, "nf", tube([[-U, -V / 3, z], [U, -V / 3, z]], [[-U, V / 3, z], [U, V / 3, z]]));
+    }
+    path(g, "fo t4", quad(W, [-U, fv, L2], [U, fv, L2], [U, fv, L2 + 1.3], [-U, fv, L2 + 1.3]));
+    let near = tube([[-U, fv, 0.6], [-U, fv, R2]], [[U, fv, 0.6], [U, fv, R2]], [[fu, bv, 0.6], [fu, bv, R2]], [[-U, fv, L2 + 1.3], [U, fv, L2 + 1.3]]);
+    for (const z of [L1, L2, R1, R2]) near += tube([[-U, fv, z], [U, fv, z]], [[fu, -V, z], [fu, V, z]]);
+    near += tube([[fu, -V, 0.6], [fu, V, L1]], [[fu, V, L1], [fu, -V, L2]]);
+    path(g, "nf sil", near);
+  }
+  /** A steel skip: sloped sides, ribs and lifting lugs, heaped with rubble, a broken block and a plank end. */
+  function skip(x, y) {
+    const g = group(depth(x, y)), W = onto(x, y, 0);
+    under(x, y, 0, 26, 12, 0, 0.46);
+    const lug = (s) => { const pts = []; for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; for (const u of [13.4, 15]) pts.push(W(s * u, Math.cos(a), 8 + Math.sin(a))); } return poly(hull(pts)); };
+    path(g, "sil t2", lug(-1));
+    const base = rring(x, y, 0, -11, -5, 11, 5, 0.6, 1).map((q) => P(q.u, q.v, 0.5)), rim = rring(x, y, 0, -14, -7, 14, 7, 0.6, 1).map((q) => P(q.u, q.v, 11));
+    const sil = poly(hull(base.concat(rim)));
+    path(g, "fo t1", sil);
+    path(g, "fo t2", quad(W, [-11, 5, 0.5], [11, 5, 0.5], [14, 7, 11], [-14, 7, 11]));
+    path(g, "fo t1", quad(W, [-13.2, -6.2, 11], [13.2, -6.2, 11], [13.2, 6.2, 11], [-13.2, 6.2, 11]));
+    path(g, "nf sil", sil);
+    // the rubble, heaped above the rim at the back
+    const heap = [];
+    for (let i = 0; i < 14; i++) { const a = (i / 14) * TAU; heap.push(W(12.4 * Math.cos(a) * (0.9 + 0.1 * hash(i + 3)), 5.4 * Math.sin(a), 10.7)); }
+    for (const [u, v, z] of [[-9, -2, 12.6], [-5, 0.5, 13.8], [-1, -1.5, 14.2], [3, 1, 13.4], [7, -2.5, 13.9], [10.5, -0.5, 12.2], [-11, 1.5, 11.6]]) heap.push(W(u, v, z));
+    path(g, "t3", poly(hull(heap)));
+    path(g, "nf", lines(W, [[-8, 1, 12.1], [-6.4, 2.6, 11.6], [-4.4, 2, 12.2]], [[1, 2.4, 12.4], [2.6, 3.8, 11.6], [4.6, 3, 12.1]], [[-3, -2.6, 13.4], [-1.4, -1.4, 13.9]], [[8.2, 1.6, 12.4], [9.8, 2.8, 11.6]]));
+    box(g, x - 4.8, y + 2.2, rad(24), -2.5, -1.5, 2.5, 1.5, 11.2, 14.2, STONE, 0.2);
+    path(g, "sil t4", quad(W, [5.4, -0.6, 12.6], [6.4, 0.4, 12.6], [16.4, -3.6, 17.2], [15.4, -4.6, 17.2]));
+    path(g, "nf sil", lines(W, [[-14, 7, 11], [14, 7, 11], [14, -7, 11]], [[-11, 5, 0.5], [11, 5, 0.5], [11, -5, 0.5]]));
+    let ribs = lines(W, [[-13.7, 6.85, 10], [13.7, 6.85, 10], [13.7, -6.85, 10]], [[11, 0, 0.5], [14, 0, 11]]);
+    for (const f of [-0.5, 0, 0.5]) ribs += lines(W, [[f * 11, 5, 0.5], [f * 14, 7, 11]]);
+    path(g, "nf", ribs);
+    path(g, "sil t2", lug(1));
+  }
+  /** Ladder frames leaning on the back hoarding, fanned: the near one whole, the others only their top rail and outer upright. */
+  function leaningFrames(x, y) {
+    const g = group(depth(x, y));
+    shadow(x + 2, y + 2.6, 10, 2.6, 0, 0.32);
+    let far = "", near = "";
+    for (let i = 0; i < 4; i++) {
+      const x0 = x - 7 + 1.2 * i - 1.8, fy = -34.5 + 0.8 * i - 1.2, ty = -42.4 + 0.5 * i, tz = 17 - 0.3 * i;
+      const A = (s, f) => P(x0 + s * 12, lerp(fy, ty, f), f * tz);
+      if (i < 3) { far += open([A(0, 1), A(1, 1)]) + open([A(1, 0), A(1, 1)]); continue; }
+      near += open([A(0, 0), A(0, 1)]) + open([A(1, 0), A(1, 1)]) + open([A(0, 0.06), A(1, 0.5)]);
+      for (const z of [5, 11, 16.6]) near += open([A(0, z / tz), A(1, z / tz)]);
+    }
+    path(g, "nf", far); path(g, "nf sil", near);
+  }
+  /** A stack of formwork panels on two bearers, with two aluminium soldiers across the top. */
+  function formwork(x, y) {
+    const g = group(depth(x, y)), W = onto(x, y, 0);
+    under(x, y, 0, 20, 10);
+    bearers(g, x, y, 0, [-7, 7], 5.6, 0, 1.5);
+    box(g, x, y, 0, -10, -5, 10, 5, 1.5, 6, TIMBER, 0.15);
+    let ln = "";
+    for (let k = 1; k < 4; k++) { const z = 1.5 + (k * 4.5) / 4; ln += lines(W, [[-10, 5, z], [10, 5, z], [10, -5, z]]); }
+    path(g, "nf", ln);
+    boxes(g, [-5, 5].map((u) => [x, y, 0, u - 1, -6, u + 1, 6, 6, 7]), WHITE);
+    path(g, "nf", lines(W, [[-5, -6, 7], [-5, 6, 7]], [[5, -6, 7], [5, 6, 7]]));
+  }
+  /** Two oil drums, rolling hoops, lids and bungs. */
+  function drums(x, y) {
+    const g = group(depth(x, y));
+    shadow(x + 0.8, y - 0.3, 8.6, 4.8, 0, 0.42);
+    for (const u of [-3.1, 3.1]) {
+      const cx = x + u, cy = y + (u < 0 ? -0.4 : 0.4), sil = lathe(g, cx, cy, [[3.1, 0], [3.1, 8.5]], 1);
+      path(g, "nf", arc(cx, cy, 3.2, 2.8) + arc(cx, cy, 3.2, 5.6) + poly(moved(circ(2.6, 20), cx, cy).map((q) => P(q.u, q.v, 8.5))) + poly(moved(circ(0.45, 10), cx + 1.3, cy - 0.9).map((q) => P(q.u, q.v, 8.5))));
+      path(g, "nf sil", sil);
+    }
+  }
+  /** A stack of mesh sheets: layer lines on the sides, the top sheet's bars, their ends standing proud. */
+  function meshStack(x, y) {
+    const g = group(depth(x, y)), W = onto(x, y, 0);
+    under(x, y, 0, 20, 8, 0, 0.38);
+    box(g, x, y, 0, -10, -4, 10, 4, 0, 3, STEEL, 0.1);
+    let ln = "";
+    for (let k = 1; k < 6; k++) { const z = k * 0.5; ln += lines(W, [[-10, 4, z], [10, 4, z], [10, -4, z]]); }
+    for (let u = -9; u <= 9; u += 3) ln += lines(W, [[u, -4, 3], [u, 4.8, 3]]);
+    for (const v of [-3, 0, 3]) ln += lines(W, [[-10, v, 3], [10.8, v, 3]]);
+    path(g, "nf", ln);
+  }
+
+  // ---------------------------------------------------------------- the right wing
+  /** A water tank (IBC): a pallet base, the white tank in its steel cage, a filler cap on top and a tap at the bottom. */
+  function ibc(x, y, deg) {
+    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), U = 5.5, V = 4.5, [eu, ev] = seen(th, -U, -V, U, V);
+    under(x, y, th, 11, 9);
+    const [pl, pg] = pallet(g, x, y, th, 0, U, V, STEEL);
+    path(g, "fo t1", pg); path(g, "nf", pl);
+    box(g, x, y, th, -U + 0.4, -V + 0.4, U - 0.4, V - 0.4, 2, 10.6, WHITE, 1.5);
+    path(g, "t5", poly(moved(circ(1.8, 18), 0, 0).map((q) => W(q.u, q.v, 10.7))));
+    let cg = lines(W, [[-U, -V, 11], [U, -V, 11], [U, V, 11], [-U, V, 11], [-U, -V, 11]], [[-U / 3, -V, 11], [-U / 3, V, 11]], [[U / 3, -V, 11], [U / 3, V, 11]]);
+    if (ev !== null) { for (const u of [-U, -U / 3, U / 3, U]) cg += lines(W, [[u, ev, 2], [u, ev, 11]]); for (const z of [4.5, 8]) cg += lines(W, [[-U, ev, z], [U, ev, z]]); }
+    if (eu !== null) { for (const v of [-V, 0, V]) cg += lines(W, [[eu, v, 2], [eu, v, 11]]); for (const z of [4.5, 8]) cg += lines(W, [[eu, -V, z], [eu, V, z]]); }
+    path(g, "nf sil", cg);
+    if (eu !== null) {
+      const o = Math.sign(eu);
+      boxes(g, [[x + Math.cos(th) * (eu + o * 0.7), y + Math.sin(th) * (eu + o * 0.7), th, -0.7, -0.9, 0.7, 0.9, 2.2, 3.6]], STEEL);
+      path(g, "nf sil", lines(W, [[eu + o * 1.4, 0, 2.9], [eu + o * 2.2, 0, 2.9], [eu + o * 2.2, 0, 2.3]]));
+    }
+  }
+  /** A tow-behind compressor: the body with its lid seam, louvres and service door, road wheels and mudguards, the drawbar with its jockey wheel, and the hose lying in coils. */
+  function compressor(x, y, deg) {
+    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), side = sees(-Math.sin(th), Math.cos(th)) ? 1 : -1;
+    shadow(x + 0.8, y - 0.2, 20, 9, th, 0.44);
+    const tyre = (v, cls) => {
+      const pts = [];
+      for (let i = 0; i < 20; i++) { const a = (i / 20) * TAU; for (const dv of [-0.8, 0.8]) pts.push(W(-4.5 + 3.4 * Math.cos(a), v + dv, 3.4 + 3.4 * Math.sin(a))); }
+      path(g, cls, poly(hull(pts)));
+    };
+    const disk = (u, v, z, r, n = 18) => poly(Array.from({ length: n }, (_, i) => { const a = (i / n) * TAU; return W(u + r * Math.cos(a), v, z + r * Math.sin(a)); }));
+    tyre(-side * 6.2, "sil t1");
+    box(g, x, y, th, -13.5, -5, 4.5, 5, 3.5, 12.5, STONE, 2.5, 1);
+    const ring = rring(x, y, th, -13.5, -5, 4.5, 5, 2.5, 3), sv = side * 5;
+    let ln = open(run(ring, front).map((q) => P(q.u, q.v, 10.5)));
+    let slots = "";
+    for (let k = 0; k < 5; k++) { const u = -11.6 + k * 1.7; slots += quad(W, [u, sv, 5.6], [u + 0.7, sv, 5.6], [u + 0.7, sv, 9.4], [u, sv, 9.4]); }
+    ln += quad(W, [-2.6, sv, 4.6], [2.8, sv, 4.6], [2.8, sv, 9.8], [-2.6, sv, 9.8]) + lines(W, [[2, sv, 7.6], [2, sv, 6.4]]);
+    path(g, "fo t1", slots); path(g, "nf", ln);
+    // the hose: from its outlet down to the ground, two loose coils and a tail with its coupling
+    const hose = [W(3, sv, 6), W(3.6, sv - side * 1.2, 3.2), P(284.6, 95, 0.5)];
+    for (let i = 0; i <= 40; i++) {
+      const t = i / 40, a = 0.4 + t * 4 * Math.PI, r = 4 - 0.6 * t, cx = 267.6 - 1.2 * t, cy = 100 + 0.4 * t;
+      if (i === 0) hose.push(P(276, 98.6, 0.5));
+      hose.push(P(cx + r * Math.cos(a), cy + r * 0.8 * Math.sin(a), 0.5));
+    }
+    hose.push(P(264, 103.4, 0.5), P(259.6, 104.6, 0.5));
+    path(g, "nf sil", open(hose) + open([P(259.4, 103.6, 0.5), P(259.8, 105.6, 0.5)]) + open([P(259.6, 104.6, 0.5), P(258.2, 105, 0.5)]));
+    // the drawbar, its hitch eye and the jockey wheel
+    let bar = lines(W, [[4.5, -3, 5], [13.5, 0, 3.5], [4.5, 3, 5]], [[11, 0, 4.4], [11, 0, 2.6]]);
+    bar += poly(Array.from({ length: 12 }, (_, i) => { const a = (i / 12) * TAU; return W(14.3 + 0.8 * Math.cos(a), 0.8 * Math.sin(a), 3.5); }));
+    path(g, "nf sil", bar);
+    path(g, "sil t2", disk(11, 0, 1.4, 1.4, 14));
+    // the near wheel with its rim and hub, under its mudguard
+    tyre(side * 6.2, "sil t1");
+    path(g, "t4", disk(-4.5, side * 7.05, 3.4, 2.1));
+    path(g, "nf sil", disk(-4.5, side * 7.1, 3.4, 0.6, 10));
+    const guard = [];
+    for (let i = 0; i <= 12; i++) { const a = rad(10 + (160 * i) / 12); guard.push([-4.5 + 4.3 * Math.cos(a), 3.4 + 4.3 * Math.sin(a)]); }
+    path(g, "sil t3", poly(guard.map(([u, z]) => W(u, side * 5.4, z)).concat(guard.slice().reverse().map(([u, z]) => W(u, side * 7.4, z)))));
+  }
+  /** A column cage lying on two bearers: four corner bars and the stirrups round them. */
+  function cage(x, y, deg) {
+    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), [, ev] = seen(th, -12, -2.5, 12, 2.5), fv = ev === null ? 2.5 : ev, bv = -fv, z0 = 1, z1 = 6;
+    under(x, y, th, 24, 6.5, 0, 0.36);
+    bearers(g, x, y, th, [-8, 8], 4, 0, 1);
+    let far = lines(W, [[-12, bv, z0], [12, bv, z0]]), near = lines(W, [[-12, fv, z0], [12, fv, z0]], [[-12, fv, z1], [12, fv, z1]], [[-12, bv, z1], [12, bv, z1]]);
+    for (let u = -10.5; u <= 10.6; u += 3.5) { far += lines(W, [[u, bv, z0], [u, bv, z1]], [[u, bv, z0], [u, fv, z0]]); near += lines(W, [[u, bv, z1], [u, fv, z1], [u, fv, z0]]); }
+    path(g, "nf", far); path(g, "nf sil", near);
+  }
+
+  // ---------------------------------------------------------------- the props the crew work at
+  /** The sand pile: a slumped cone shaded by its slopes, ripples and runnels, and the bite the shoveler takes from its right side. */
+  function sandPile([x, y]) {
+    const g = group(depth(x, y)), n = 36;
+    shadow(x + 1.5, y - 0.6, 20.5, 16.5, 0, 0.4);
+    const wob = (a) => 1 + 0.07 * Math.sin(a * 3 + 1) + 0.03 * Math.sin(a * 7 + 2);
+    const PROF = [[1, 0, 0], [0.76, 2.6, 0.2], [0.5, 7.6, 0.55], [0.3, 10.8, 0.8], [0.15, 12.4, 0.95]];
+    const at = (k, a) => { const [s, z, m] = PROF[k], w = wob(a); return [x - 3 * m + 17 * s * w * Math.cos(a), y - m + 14 * s * w * Math.sin(a), z]; };
+    const rings = PROF.map((_, k) => Array.from({ length: n }, (__, i) => at(k, (i / n) * TAU)));
+    const runs = {};
+    for (let k = 0; k + 1 < rings.length; k++) toneRuns(rings[k], rings[k + 1], 0, runs);
+    const sil = poly(hull(rings.flat().map(P3)));
+    path(g, "fo t3", sil); paint(g, runs); path(g, "fo t5", poly(rings[4].map(P3)));
+    // ripples across the slope and runnels down it, on the faces we see
+    const on = (s, a, z) => { const w = wob(a), m = (z / 12.4) * 0.95; return P(x - 3 * m + 17 * s * w * Math.cos(a), y - m + 14 * s * w * Math.sin(a), z); };
+    const sAt = (z) => (z < 2.6 ? 1 - (0.24 * z) / 2.6 : z < 7.6 ? 0.76 - (0.26 * (z - 2.6)) / 5 : 0.5 - (0.2 * (z - 7.6)) / 3.2);
+    let tex = "";
+    for (const [a0, a1, z] of [[1.6, 2.3, 3.6], [2.0, 2.5, 6.2], [0.9, 1.4, 5], [2.6, 3.0, 2.2], [1.2, 1.7, 8.4], [1.9, 2.2, 9.6]]) {
+      const pts = [];
+      for (let i = 0; i <= 6; i++) { const a = a0 + ((a1 - a0) * i) / 6; pts.push(on(sAt(z) + 0.02 * Math.sin(i * 1.7), a, z)); }
+      tex += open(pts);
+    }
+    for (const [a, za, zb] of [[1.75, 1, 5.2], [2.35, 0.6, 3.4], [1.15, 6.2, 9.4]]) tex += open([on(sAt(zb), a, zb), on(sAt((za + zb) / 2), a + 0.05, (za + zb) / 2), on(sAt(za), a + 0.02, za)]);
+    // the shovel's bite, facing the shoveler
+    const bite = [], floor = [];
+    for (let i = 0; i <= 8; i++) {
+      const a = -0.18 + (0.62 * i) / 8, e = 1 - ((i - 4) / 4) ** 2;
+      bite.push(on(sAt(6.4 - 1.2 * e) , a, 6.4 - 1.2 * e));
+      floor.push(on(sAt(2.2) - 0.12 * e, a, 2.2 + 0.3 * e));
+    }
+    path(g, "fo t2", poly(bite.concat(floor.slice().reverse())));
+    tex += open(bite) + open([bite[3], floor[3]]) + open([bite[5], floor[5]]);
+    path(g, "nf", tex);
+    path(g, "nf sil", sil);
+  }
+  /**
+   * A cement sack: a rounded box whose sides bulge and whose top sags to its corners, shaded like a box,
+   * with its folded end and the printed panel on top.
+   */
+  function sack(g, x, y, th, u0, v0, u1, v1, z0, z1) {
+    const W = onto(x, y, th), cu = (u0 + u1) / 2, cv = (v0 + v1) / 2, hu = (u1 - u0) / 2, hv = (v1 - v0) / 2, h = z1 - z0, c = Math.cos(th), s = Math.sin(th);
+    const ring = rrect(u0, v0, u1, v1, Math.min(hu, hv) * 0.8, 4);
+    const at = (q, k, z) => W(cu + (q.u - cu) * k, cv + (q.v - cv) * k, z);
+    const sag = (q) => z1 - h * 0.17 * (((q.u - cu) / hu) ** 2 + ((q.v - cv) / hv) ** 2);
+    const bot = ring.map((q) => at(q, 0.93, z0)), belly = ring.map((q) => at(q, 1, z0 + h * 0.42)), top = ring.map((q) => at(q, 0.9, sag(q)));
+    const sil = poly(hull(bot.concat(belly, top)));
+    const wn = (q) => ({ nu: q.nu * c - q.nv * s, nv: q.nu * s + q.nv * c });
+    const idx = ring.map((q, i) => i), lit = run(idx, (i) => { const q = wn(ring[i]); return front(q) && !facesRight(q); });
+    path(g, "fo t2", sil);
+    if (lit.length > 1) path(g, "fo t3", poly(lit.map((i) => top[i]).concat(lit.map((i) => belly[i]).reverse())));
+    path(g, "fo t5", poly(top));
+    path(g, "nf sil", sil);
+    const long = hu > hv, e = long ? hu : hv, fold = (k) => (long ? [cu + k * e, cv - hv * 0.8] : [cu - hu * 0.8, cv + k * e]), fold2 = (k) => (long ? [cu + k * e, cv + hv * 0.8] : [cu + hu * 0.8, cv + k * e]);
+    const zt = (p) => z1 - h * 0.17 * (((p[0] - cu) / hu) ** 2 + ((p[1] - cv) / hv) ** 2) + 0.05;
+    const L = (p) => W(p[0], p[1], zt(p));
+    const pa = long ? [[cu - e * 0.32, cv - hv * 0.42], [cu + e * 0.32, cv - hv * 0.42], [cu + e * 0.32, cv + hv * 0.42], [cu - e * 0.32, cv + hv * 0.42]] : [[cu - hu * 0.42, cv - e * 0.32], [cu + hu * 0.42, cv - e * 0.32], [cu + hu * 0.42, cv + e * 0.32], [cu - hu * 0.42, cv + e * 0.32]];
+    path(g, "nf", open([L(fold(0.74)), L(fold2(0.74))]) + poly(pa.map(L)));
+  }
+  /** The cement bags on their pallet: three across, two along on top. */
   function bagPallet([x, y]) {
-    const g = mk("g", {}, layer);
-    putC(solid(g), rbox(x, y, 0, -13, -10, 13, 10, 0, 2.8, 1, 0.6));
-    for (const u of [-8.4, 0, 8.4]) putC(solid(g), rbox(x + u, y, 0, -3.9, -9.2, 3.9, 9.2, 2.8, 6.8, 2.6, 0.9));
-    for (const v of [-4.6, 4.6]) putC(solid(g), rbox(x, y + v, 0, -12.4, -4.3, 12.4, 4.3, 6.8, 10.8, 2.6, 0.9));
-    item(g, depth(x, y));
+    const g = group(depth(x, y));
+    under(x, y, 0, 26, 20);
+    const [pl, pg] = pallet(g, x, y, 0, 0, 13, 10);
+    path(g, "fo t1", pg); path(g, "nf", pl);
+    for (const u of [-8.4, 0, 8.4]) sack(g, x + u, y, 0, -3.9, -9.2, 3.9, 9.2, 2, 6);
+    for (const v of [-4.6, 4.6]) sack(g, x, y + v, 0, -12.4, -4.3, 12.4, 4.3, 6, 10.2);
   }
-
+  /** A traffic cone: a rubber base, the cone shaded by its slope, a reflective collar. */
   function cone(x, y) {
-    const g = mk("g", {}, layer);
-    putC(solid(g), rbox(x, y, 0, -3.4, -3.4, 3.4, 3.4, 0, 1, 0.9, 0));
-    mk("path", { class: "sil", d: poly(hull(ringAt(P, moved(circ(2.5, 24), x, y), 1).concat(ringAt(P, moved(circ(0.6, 12), x, y), 9)))) }, g);
-    mk("path", { class: "nf", d: open(ringAt(P, run(moved(circ(1.55, 24), x, y), front), 5)) }, g);
-    item(g, depth(x, y));
+    const g = group(depth(x, y));
+    shadow(x + 0.7, y - 0.2, 5, 5, 0, 0.4);
+    box(g, x, y, 0, -3.4, -3.4, 3.4, 3.4, 0, 0.9, STEEL, 0.9);
+    const sil = lathe(g, x, y, [[2.5, 0.9], [0.55, 9.2]], 2, 20);
+    const r = (z) => 2.5 - (1.95 * (z - 0.9)) / 8.3, f = run(circ(1, 20), front);
+    const band = (z) => f.map((q) => P(x + r(z) * q.u, y + r(z) * q.v, z));
+    path(g, "fo hv", poly(band(4.2).concat(band(5.9).reverse())));
+    path(g, "nf sil", sil);
   }
 
+  // ---------------------------------------------------------------- the mixer
+  /** The site mixer: a drum turning on its cradle, its blades seen through the mouth, the motor housing, chassis, two wheels and the tow bar. */
   function makeMixer([x, y], psi) {
-    const g = mk("g", {}, layer), tilt = rad(26);
+    const g = group(depth(x, y)), tilt = rad(26);
     const a = [Math.cos(psi) * Math.cos(tilt), Math.sin(psi) * Math.cos(tilt), Math.sin(tilt)];
-    const e1 = [-Math.sin(psi), Math.cos(psi), 0];
-    const e2 = [a[1] * e1[2] - a[2] * e1[1], a[2] * e1[0] - a[0] * e1[2], a[0] * e1[1] - a[1] * e1[0]];
+    const e1 = [-Math.sin(psi), Math.cos(psi), 0], e2 = cross(a, e1);
     const O = [x - a[0] * 5, y - a[1] * 5, 12.5];
     const dir = (b) => v3.add(v3.mul(e1, Math.cos(b)), v3.mul(e2, Math.sin(b)));
     const at = (t, R, b) => v3.add(v3.add(O, v3.mul(a, t)), v3.mul(dir(b), R));
-    const vis = (b) => { const n = dir(b); return n[0] * VIEW[0] + n[1] * VIEW[1] + n[2] * VIEW[2] > 0; };
-    const ring = (t, R, n = 36) => Array.from({ length: n }, (_, i) => P3(at(t, R, (i / n) * TAU)));
-    const side = -Math.sin(psi) * sA + Math.cos(psi) * cA >= 0 ? 1 : -1;
-    const W = (u, v, z) => P(x + u * Math.cos(psi) - v * Math.sin(psi), y + u * Math.sin(psi) + v * Math.cos(psi), z);
+    const W = onto(x, y, psi), side = sees(-Math.sin(psi), Math.cos(psi)) ? 1 : -1, nearB = side > 0 ? 0 : Math.PI;
+    const PROF = [[-3.6, 6.4], [0, 8.8], [8, 8.8], [15, 4.8]];
+    const R = (t) => { for (let k = 0; k + 1 < PROF.length; k++) { const [ta, ra] = PROF[k], [tb, rb] = PROF[k + 1]; if (t <= tb) return ra + ((rb - ra) * (t - ta)) / (tb - ta); } return 4.8; };
+    const normal = (t, b) => { const k = t < 0 ? 0 : t < 8 ? 1 : 2, [ta, ra] = PROF[k], [tb, rb] = PROF[k + 1]; return v3.norm(v3.sub(v3.mul(dir(b), tb - ta), v3.mul(a, rb - ra))); };
+    const vis = (t, b) => dot(normal(t, b), VIEW) > 0;
+    const ringP = (t, r, n = 40) => Array.from({ length: n }, (_, i) => P3(at(t, r, (i / n) * TAU)));
+    const curve = (fn, n = 48) => { let d = "", pts = []; for (let i = 0; i <= n; i++) { const p = fn(i / n); if (p) pts.push(p); else { if (pts.length > 1) d += open(pts); pts = []; } } return pts.length > 1 ? d + open(pts) : d; };
+    const wheel = (v) => { const pts = []; for (let i = 0; i < 20; i++) { const b = (i / 20) * TAU; for (const dv of [-0.8, 0.8]) pts.push(W(-3 + 3.6 * Math.cos(b), v + dv, 3.6 + 3.6 * Math.sin(b))); } return poly(hull(pts)); };
+    const disk = (u, v, z, r, n = 18) => poly(Array.from({ length: n }, (_, i) => { const b = (i / n) * TAU; return W(u + r * Math.cos(b), v, z + r * Math.sin(b)); }));
+    const trunnion = (sgn) => P3(at(3, 9.8, sgn > 0 ? 0 : Math.PI));
 
-    putC(solid(g), rbox(x, y, psi, -12, -5.5, 9, 5.5, 3.6, 6, 1.2, 0.6));
-    putC(solid(g), rbox(x, y, psi, -13, -4.4, -6.5, 4.4, 6, 12.5, 1.2, 0.6));
-    const wheel = [];
-    for (let i = 0; i < 24; i++) { const b = (i / 24) * TAU; wheel.push(W(-3 + 3.6 * Math.cos(b), side * 6.6, 3.6 + 3.6 * Math.sin(b))); }
-    mk("path", { class: "sil", d: poly(wheel) }, g);
-    mk("path", { class: "nf sil", d: open([W(9, 0, 4.4), W(17, 0, 1.6)]) + open([W(7.5, 0, 3.6), W(7.5, 0, 0)]) + seg(W(-1, -3, 6), P3(at(3, 7.6, -Math.PI / 2))) + seg(W(-1, 3, 6), P3(at(3, 7.6, -Math.PI / 2))) }, g);
-    mk("path", { class: "sil", d: poly(hull([...ring(-3.6, 6.4), ...ring(0, 8.8), ...ring(8, 8.8), ...ring(15, 4.8)])) }, g);
-    const band = [];
-    for (let i = 0; i <= 48; i++) { const b = (i / 48) * TAU; if (vis(b)) band.push(P3(at(8, 8.8, b))); }
-    mk("path", { class: "nf lo", d: open(band) }, g);
-    const fins = mk("path", { class: "nf" }, g);
-    const mouthOpen = a[0] * VIEW[0] + a[1] * VIEW[1] + a[2] * VIEW[2] > 0;
+    shadow(x + 1, y - 0.4, 17, 10.5, psi, 0.46);
+    // behind the drum: the far wheel and arm, the chassis, the motor and the tow bar
+    path(g, "sil t1", wheel(-side * 6.6));
+    path(g, "nf sil", open([W(-2, -side * 3.6, 5.4), trunnion(-side), W(6, -side * 3.6, 5.4)]));
+    box(g, x, y, psi, -12, -4, 9, 4, 3.4, 5.6, STEEL, 0.6);
+    box(g, x, y, psi, -13, -4.4, -6.5, 4.4, 5.6, 12.5, STONE, 1.2, 0.6);
+    const [, mv] = seen(psi, -13, -4.4, -6.5, 4.4);
+    let vents = "";
+    if (mv !== null) for (let k = 0; k < 4; k++) vents += lines(W, [[-12, mv, 7.4 + k * 1.1], [-9, mv, 7.4 + k * 1.1]]);
+    path(g, "nf", vents + lines(W, [[-13.4, 0, 12.5], [-13.4, 0, 13.4]]));
+    path(g, "nf sil", lines(W, [[9, -2.6, 4.4], [17, 0, 2.2], [9, 2.6, 4.4]], [[14, 0, 3], [14, 0, 0.4]], [[13, -0.9, 0.4], [15, 0.9, 0.4]]) + poly(Array.from({ length: 10 }, (_, i) => { const b = (i / 10) * TAU; return W(17.8 + 0.8 * Math.cos(b), 0.8 * Math.sin(b), 2.2); })));
+    // the drum, shaded by its normals
+    const N = 48, rings = PROF.map(([t, r]) => Array.from({ length: N }, (_, i) => at(t, r, (i / N) * TAU)));
+    const runs = {};
+    for (let k = 0; k + 1 < rings.length; k++) toneRuns(rings[k], rings[k + 1], 0, runs);
+    const sil = poly(hull(rings.flat().map(P3)));
+    path(g, "fo t1", sil); paint(g, runs);
+    path(g, "nf", [0, 8].map((t) => curve((u) => { const b = u * TAU; return vis(t + 0.01, b) || vis(t - 0.01, b) ? P3(at(t, R(t), b)) : null; })).join(""));
+    path(g, "nf sil", [-2.1, -1.1].map((t) => curve((u) => { const b = u * TAU; return vis(t, b) ? P3(at(t, R(t) + 0.25, b)) : null; })).join(""));
+    const seams = mk("path", { class: "nf" }, g), teeth = mk("path", { class: "nf sil" }, g);
+    path(g, "nf sil", sil);
+    // the mouth: its lip, the dark inside, and the blades turning in it
+    const mouthOpen = dot(a, VIEW) > 0, hole = ringP(15.05, 3.9);
+    let blades = null;
     if (mouthOpen) {
-      mk("path", { d: poly(ring(15, 4.8)) }, g);
-      mk("path", { class: "nf lo", d: poly(ring(14.4, 3.3)) }, g);
+      path(g, "fo t4", poly(ringP(15, 4.8)));
+      path(g, "fo t1", poly(hole));
+      blades = mk("path", { class: "nf sil" }, g);
+      path(g, "nf sil", poly(ringP(15, 4.8)));
+      path(g, "nf", poly(hole));
     }
-    item(g, depth(x, y));
-    const m = { spin: 0 };
+    const inHole = (p) => { let sgn = 0; for (let i = 0; i < hole.length; i++) { const q = hole[i], r = hole[(i + 1) % hole.length], c = (r[0] - q[0]) * (p[1] - q[1]) - (r[1] - q[1]) * (p[0] - q[0]); if (c) { if (sgn && Math.sign(c) !== sgn) return false; sgn = Math.sign(c); } } return true; };
+    // in front: the near arm and its trunnion, the tipping handwheel, the near wheel and its hub
+    const tn = trunnion(side), hub = at(3, 11.2, nearB), hw = [];
+    for (let i = 0; i < 20; i++) { const b = (i / 20) * TAU; hw.push(P3(v3.add(v3.add(hub, v3.mul(a, 2.4 * Math.cos(b))), [0, 0, 2.4 * Math.sin(b)]))); }
+    let spokes = "";
+    for (let k = 0; k < 3; k++) { const b = (k / 3) * TAU + 0.5; spokes += open([P3(hub), P3(v3.add(v3.add(hub, v3.mul(a, 2.4 * Math.cos(b))), [0, 0, 2.4 * Math.sin(b)]))]); }
+    path(g, "nf sil", open([W(-2, side * 3.6, 5.4), tn, W(6, side * 3.6, 5.4)]) + open([tn, P3(hub)]) + poly(hw) + spokes);
+    path(g, "sil t1", wheel(side * 6.6));
+    path(g, "t4", disk(-3, side * 7.45, 3.6, 2.2));
+    path(g, "nf sil", disk(-3, side * 7.5, 3.6, 0.6, 10));
+
+    const m = { spin: 0, last: null };
     m.draw = () => {
+      if (m.spin === m.last) return;
+      m.last = m.spin;
       let d = "";
-      for (let k = 0; k < 3; k++) {
-        let pts = [];
-        for (let t = 0; t <= 8; t += 0.5) {
-          const b = m.spin + (k * TAU) / 3 + t * 0.16;
-          if (vis(b)) pts.push(P3(at(t, 8.8, b)));
-          else { d += open(pts); pts = []; }
-        }
-        d += open(pts);
+      for (let k = 0; k < 3; k++) d += curve((u) => { const t = u * 14.2, b = m.spin + (k * TAU) / 3 + t * 0.2; return vis(t, b) ? P3(at(t, R(t) + 0.05, b)) : null; }, 36);
+      setD(seams, d);
+      let e = "";
+      for (let i = 0; i < 30; i++) { const b = m.spin + (i * TAU) / 30; if (vis(-1.6, b)) e += open([P3(at(-2.1, 7.95, b)), P3(at(-1.1, 7.95, b))]); }
+      setD(teeth, e);
+      if (blades) {
+        let bl = "";
+        for (let k = 0; k < 2; k++) for (const dr of [2.6, 0.2]) bl += curve((u) => { const t = 14.8 - u * 13, b = m.spin + k * Math.PI + (15 - t) * 0.42, p = P3(at(t, R(t) - dr, b)); return inHole(p) ? p : null; }, 40);
+        setD(blades, bl);
       }
-      setD(fins, d);
     };
     return m;
   }
 
+  // ---------------------------------------------------------------- the site, as the plan lays it out
+  const Z = PAD.h, at = (x, y, fn, key = depth(x, y)) => ({ key, fn });
+  // Behind the 404, in the yard and round the right wing, nothing that moves ever comes near: drawn flat, back to front.
+  flat = { shade: mk("g", {}, ground), props: mk("g", {}, ground) };
+  backHoarding();
+  [
+    // the stock yard on its pad, and a fresh delivery by the left gate
+    at(-108, -5, () => blockPallet(-108, -5, 0, Z, { two: true })),
+    at(-90, -5, () => blockPallet(-90, -5, 0, Z)),
+    at(-108, 10, () => blockPallet(-108, 10, 0, Z)),
+    at(-90, 10, () => blockPallet(-90, 10, 0, Z, { used: true })),
+    at(-108, 33, () => blockPallet(-108, 33, 0, Z, { two: true })),
+    at(-90, 33, () => blockPallet(-90, 33, 0, Z)),
+    at(-108, 48, () => blockPallet(-108, 48, 0, Z)),
+    at(-90, 48, () => blockPallet(-90, 48, 0, Z, { two: true })),
+    at(-99, 66, () => timber(-99, 66, 0, Z, 32, 9, 5)),
+    at(-110, 21.5, () => looseBlocks(-110, 21.5, 6, Z, [[-1.4, 0, -4, 0], [1.4, 0.2, 5, 0], [0, 0, 84, 3.2]], 5, 2.6)),
+    at(-106, 90, () => blockPallet(-106, 90, 0, 0, { two: true })),
+    at(-88, 92, () => blockPallet(-88, 92, 6, 0)),
+    at(-100, 116, () => cone(-100, 116)),
+    at(-84, 126, () => cone(-84, 126)),
+    // south of the left crane, and left of the 404: everything moving there is nearer
+    at(-65, 70, () => planks(-65, 70, -4)),
+    at(-74, 80, () => cone(-74, 80)),
+    at(-30, 5, () => blockPallet(-30, 5, 8, 0)),
+    at(-12, 14, () => looseBlocks(-12, 14, -14, 0, [[-5.6, 0, 6, 0], [0, 0.3, -5, 0], [5.6, -0.2, 4, 0], [2.8, 0, 90, 3.2]], 5, 3)),
+    // the back strip
+    at(-104, -25, () => scaffoldBay(-104, -25, -45)),
+    at(-50, -28, () => skip(-50, -28)),
+    at(-22, -37, () => leaningFrames(-22, -37)),
+    at(18, -24, () => timber(18, -24, 0, 0, 30, 8, 3.5, 2)),
+    at(150, -23, () => rebar(150, -23, 0, 40, 4, 2.5, 2)),
+    at(184, -32, () => blockPallet(184, -32, 0, 0, { two: true })),
+    at(201, -32, () => blockPallet(201, -32, 0, 0)),
+    at(184, -17, () => blockPallet(184, -17, 0, 0)),
+    at(201, -17, () => blockPallet(201, -17, 0, 0, { used: true })),
+    at(249, -29, () => formwork(249, -29)),
+    at(274, -27, () => drums(274, -27)),
+    at(197, 14, () => meshStack(197, 14)),
+    // the right wing: the bag pallet, the water tank, the right side of the hoarding and its gate
+    at(PALLET[0], PALLET[1], () => bagPallet(PALLET)),
+    at(278, 21, () => ibc(278, 21, 90)),
+    at(0, 0, () => sideHoarding(false), depth(297, 7.5) + 6),
+    at(0, 0, () => sideHoarding(true), depth(297, 42.5) + 6),
+    at(290, 67, () => cone(290, 67)),
+  ].sort((p, q) => p.key - q.key).forEach((p) => p.fn());
+  flat = null;
+  // beside the crane footings and where the crew walk: in the depth sort
+  timber(-67, 44, 90, 0, 32, 9, 5);
+  rebar(-57, 43, 90, 36, 4.5, 2.5);
+  cage(230, 35, -6);
+  rebar(232, 46, -6, 26, 4.5, 2.5, 1, 2);
+  compressor(279, 87, 90);
   sandPile(PILE);
-  bagPallet(PALLET);
-  cone(-96, 50); cone(-104, 72); cone(-100, 116); cone(-84, 126);
-  const mixer = makeMixer(MIXER, rad(160));
+  const mixer = makeMixer(MIXER, rad(140));
 
   return { mixer, update(dt) { mixer.spin += dt * 1.6; }, draw() { mixer.draw(); } };
 }
@@ -1567,89 +2189,369 @@ function siteBlocks(ctx) {
   return { blocks, ghosts, isIn, isOut, placeable, taken, clear, findSpot, update, draw };
 }
 
-/** The two tower cranes: their masts and slewing tops, the hook and its load, and the jobs that put blocks back. */
+/**
+ * The two tower cranes: lattice masts on ballasted footings, slewing tops (turntable, cab, cathead,
+ * jib, counter-jib and counterweights), the trolley, the hook and its load's rigging, and the jobs
+ * that put blocks back. They move like heavy machines: every drive follows a jerk-limited S-curve
+ * within its speed limit, the top sways on the mast when a slew stops, and what hangs from the hook
+ * is a pendulum whose period follows the rope's length.
+ */
 function siteCranes(ctx, B) {
   const {
-    ringAt, hull, poly, open, seg, clamp, lerp, mk, solid, place, sA, cA, depth, wrap, smooth, SZ, SL, SAFE,
-    HOOK_GROUND, JIB, CRANES, P, ground, layer, tops, item, setD, putC, rring, rbox, story, still,
+    poly, open, seg, clamp, mk, sA, cA, depth, wrap, SZ, SL, SAFE, HOOK_GROUND, JIB, CRANES, P, layer, tops, item, setD,
+    rring, hull, story, still, boxFaces, shadedBox, putBox, makeShadow, toneOf, hash,
   } = ctx;
   const { blocks, placeable, findSpot } = B;
 
-  // ---------------------------------------------------------------- cranes
+  // ---------------------------------------------------------------- projection, flattened
+  // The camera is orthographic: a world point's screen place is a sum of three screen vectors.
+  const O = P(0, 0, 0), dP = (q) => [q[0] - O[0], q[1] - O[1]];
+  const EX = dP(P(1, 0, 0)), EY = dP(P(0, 1, 0)), EZ = dP(P(0, 0, 1));
+  /** A frame turned by f about (x, y): local (u forward, v left, z up) to screen. */
+  function basis(x, y, f) {
+    const c = Math.cos(f), s = Math.sin(f);
+    const U0 = c * EX[0] + s * EY[0], U1 = c * EX[1] + s * EY[1], V0 = -s * EX[0] + c * EY[0], V1 = -s * EX[1] + c * EY[1];
+    const o0 = O[0] + x * EX[0] + y * EY[0], o1 = O[1] + x * EX[1] + y * EY[1];
+    return (u, v, z) => [o0 + u * U0 + v * V0 + z * EZ[0], o1 + u * U1 + v * V1 + z * EZ[1]];
+  }
+  const r3 = (n) => Math.round(n * 1000) / 1000;
+
+  // ---------------------------------------------------------------- the machine
+  const MW = 5.5;            // the mast's half width
+  const G = 130;             // gravity, in units/s² (a unit is about 7 cm)
+  // drive limits: speed and peak acceleration; the slew in rad, trolley and hoist in units
+  const SLEW = { v: 0.5, a: 0.4 }, HOIST = { v: 110, a: 190 };
+  // at the hook, the slew and the trolley are held to a travel speed (slower with a load) and an acceleration
+  const HOOK_V = [36, 28], HOOK_A = 26, TROLLEY_A = 16;
+  const SWAY_W = 4.4, SWAY_Z = 0.12, SWAY_K = 0.35;  // the top on its mast: about 0.7 Hz, lightly damped
+  const STEEL = ["t2", "t4", "t5"], CONC = ["t2", "t3", "t5"], WEIGHT = ["t1", "t3", "t4"];
+  const BANDS = [16, 60, 180];   // how far out the core, the counter-jib and the jib reach
+  const JU0 = 6, NP = 20, PL = (JIB - JU0) / NP, JV = 3.2;   // the jib: root, panels, half width
+  const HOOK_PLANE = Math.atan2(-sA, cA);                      // the hook is seen flat on
+  // the hook's outline in its own plane (a along it, z up from the hook's height), shank and swivel nut to the bowl and tip
+  const HOOK = (() => {
+    const pts = [[-0.6, 1.7], [0.4, 1.7], [0.4, 1.1], [0.15, 1.1], [0.15, -1.25]];
+    for (let i = 1; i <= 5; i++) { const a = Math.PI + (i / 5) * Math.PI; pts.push([0.6 + 0.45 * Math.cos(a), -1.25 + 0.45 * Math.sin(a)]); }
+    pts.push([1.05, -0.7], [1.3, -0.45], [1.55, -0.7], [1.55, -1.25]);
+    for (let i = 1; i <= 6; i++) { const a = -(i / 6) * Math.PI; pts.push([0.6 + 0.95 * Math.cos(a), -1.25 + 0.95 * Math.sin(a)]); }
+    pts.push([-0.35, 1.1], [-0.6, 1.1]);
+    return pts;
+  })();
+  const UNIT = "M1 0A1 1 0 0 1 -1 0A1 1 0 0 1 1 0Z";
+
+  // ---------------------------------------------------------------- building
   function makeCrane(c) {
-    const k = { ...c, th: c.park, r: 64, h: SAFE, steps: [], cur: null, job: null, mode: null, spot: null, sx: 0, sy: 0, svx: 0, svy: 0, tp: null, tv: [0, 0], side: null };
-    const { x, y, H } = c;
-    // footing, mast and its lattice
-    const g = mk("g", {}, layer);
-    putC(solid(g), rbox(x, y, 0, -13, -13, 13, 13, 0, 4.5, 3, 1.2));
-    putC(solid(g), rbox(x, y, 0, -4.6, -4.6, 4.6, 4.6, 4.5, H, 1.2, 0.6));
-    let lat = "";
-    const zs = [];
-    for (let z = 6; z <= H - 2; z += 7.5) zs.push(z);
-    lat += open(zs.map((z, i) => P(x + 4.6, y + (i % 2 ? 3.2 : -3.2), z)));
-    lat += open(zs.map((z, i) => P(x + (i % 2 ? -3.2 : 3.2), y + 4.6, z)));
-    mk("path", { class: "nf", d: lat }, g);
-    item(g, depth(x, y));
-    // the hook, its cable and slings: an item, so it paints in depth order with the load
+    const k = {
+      ...c, th: c.park, r: 64, h: SAFE, steps: [], cur: null, job: null, mode: null, spot: null, sx: 0, sy: 0,
+      w: 0, vr: 0, vh: 0, pw: 0, pvh: 0, pom: 0, pvr: 0, flex: 0, fv: 0, ax: 0, ay: 0, avx: 0, avy: 0, pL: null,
+      bz: 0, bv: 0, yv: 0, held: null, lifts: 0, hz: SAFE, dF: null, dR: null, dH: "", order: "", tf: c.park, tr: 64, bands: [null, null, null], shF: [0, 0],
+    };
+    // the cab hangs on the side that faces the viewer when parked
+    k.cabSide = -Math.sin(c.park) * sA + Math.cos(c.park) * cA >= 0 ? 1 : -1;
+    buildMast(k);
+    // the hook, its rope and the rigging: an item, so it paints in depth order with the load
     const hg = mk("g", {}, layer);
-    k.cable = mk("path", { class: "nf" }, hg);
-    k.block = solid(hg);
-    k.hook = mk("path", { class: "nf sil" }, hg);
+    k.rope = mk("path", { class: "nf" }, hg);
+    k.block = mbox(hg, STEEL, true);
+    k.hook = mk("path", { class: "t4 sil" }, hg);
     k.sling = mk("path", { class: "nf" }, hg);
     k.hookIt = item(hg);
-    // the slewing top: painted after everything on the ground
-    const t = mk("g", {}, tops);
-    k.parts = {
-      cw: solid(t), cj: solid(t), cjl: mk("path", { class: "nf" }, t), apex: mk("path", { class: "sil" }, t),
-      turn: solid(t), cab: solid(t), win: mk("path", { class: "nf" }, t),
-      trolley: solid(t), jib: solid(t), jl: mk("path", { class: "nf" }, t), ties: mk("path", { class: "nf" }, t),
-    };
-    k.top = t;
+    k.hookShade = makeShadow();
+    // faint long shadows of the jib and counter-jib, laid on the ground by a transform so their softness follows them
+    k.jibShade = [0.13, 0.15].map((o) => {
+      const el = makeShadow().el;
+      el.setAttribute("d", UNIT);
+      el.setAttribute("fill-opacity", o);
+      return el;
+    });
+    buildTop(k);
     return k;
   }
 
-  function drawCrane(k) {
-    const { x, y, H, th, r } = k, p = k.parts, c = Math.cos(th), s = Math.sin(th);
-    const L = (u, v, z) => P(x + u * c - v * s, y + u * s + v * c, z);
-    const away = c * sA + s * cA < 0;
-    if (away !== k.side) {
-      k.side = away;
-      const back = [p.cw.g, p.cj.g, p.cjl, p.apex, p.turn.g, p.cab.g, p.win], jib = [p.trolley.g, p.jib.g, p.jl];
-      for (const e of away ? [...jib, ...back.slice().reverse()] : [...back, ...jib]) k.top.appendChild(e);
-      k.top.appendChild(p.ties);
+  /** The footing, its ballast and the lattice mast: built once, they never move. */
+  function buildMast(k) {
+    const { x, y, H } = k, g = mk("g", {}, layer), W = (u, v, z) => P(x + u, y + v, z);
+    makeShadow().set(x, y, 21, 21, 0, 0.42);
+    const box = (tones, u0, v0, u1, v1, z0, z1, r, b) => putBox(shadedBox(g, tones), boxFaces(rring(x, y, 0, u0, v0, u1, v1, r), z0, z1,
+      b ? rring(x, y, 0, u0 + b, v0 + b, u1 - b, v1 - b, Math.max(0.3, r - b)) : null));
+    const ballast = (side) => { for (let i = 0; i < 2; i++) box(WEIGHT, side * 10.2 - 2.7, -11.5, side * 10.2 + 2.7, 11.5, 2.6 + i * 3.1, 2.5 + (i + 1) * 3.1, 0.7, 0.5); };
+    // the cast pad, and the ballast stack behind the mast
+    box(CONC, -15, -15, 15, 15, 0, 2.6, 2.4, 1);
+    ballast(-1);
+    // the mast: four chords, X bracing on the faces, ties at the section joints, a ladder inside
+    const zb = 3.4, zt = H - 1.6, n = Math.max(6, Math.round((zt - zb) / 10.5)), dz = (zt - zb) / n;
+    const C = [[-MW, MW], [MW, MW], [MW, -MW], [-MW, -MW]];   // front left, front right, back right, back left
+    const X = (a, b, z0, z1) => seg(W(a[0], a[1], z0), W(b[0], b[1], z1)) + seg(W(b[0], b[1], z0), W(a[0], a[1], z1));
+    let back = seg(W(C[3][0], C[3][1], zb), W(C[3][0], C[3][1], zt)), side = "", face = "", ties = "", lad = "";
+    for (let i = 0; i < n; i++) {
+      const z0 = zb + i * dz, z1 = z0 + dz;
+      face += X(C[0], C[1], z0, z1);
+      side += X(C[1], C[2], z0, z1);
     }
-    putC(p.cw, rbox(x, y, th, -58, -5.5, -44, 5.5, H - 9, H + 4, 1.6, 0.8));
-    putC(p.cj, rbox(x, y, th, -55, -3.2, -4, 3.2, H + 2.5, H + 7.5, 1, 0.6));
-    const ns = -s * sA + c * cA >= 0 ? 1 : -1;
-    const zig = (u0, u1, step, v, za, zb) => { const pts = []; for (let u = u0, i = 0; u <= u1; u += step, i++) pts.push(L(u, v, i % 2 ? zb : za)); return open(pts); };
-    setD(p.cjl, zig(-42, -6, 6, ns * 3.2, H + 3, H + 7));
-    const foot = rring(x, y, th, -3.8, -3.8, 3.8, 3.8, 1), head = rring(x, y, th, -1.1, -1.1, 1.1, 1.1, 0.5);
-    setD(p.apex, poly(hull(ringAt(P, foot, H + 9).concat(ringAt(P, head, H + 34)))));
-    putC(p.turn, rbox(x, y, th, -7, -7, 7, 7, H, H + 2.5, 2, 0.8));
-    putC(p.cab, rbox(x, y, th, -1, 4, 8, 11, H + 2.5, H + 10.5, 1.4, 0.7));
-    const winFace = c * sA + s * cA >= 0;
-    setD(p.win, winFace ? poly([L(8.05, 5.4, H + 5), L(8.05, 9.6, H + 5), L(8.05, 9.6, H + 9), L(8.05, 5.4, H + 9)]) : "");
-    putC(p.trolley, rbox(x, y, th, r - 4, -3.6, r + 4, 3.6, H - 1.4, H + 2.6, 1, 0.5));
-    putC(p.jib, rbox(x, y, th, -4, -3, JIB, 3, H + 2.5, H + 9, 1, 0.6));
-    setD(p.jl, zig(4, JIB - 4, 7.5, ns * 3, H + 3, H + 8.5));
-    const A = P(x, y, H + 34);
-    setD(p.ties, seg(A, L(70, 0, H + 9)) + seg(A, L(136, 0, H + 9)) + seg(A, L(-52, 0, H + 7.5)));
-
-    // hook, cable, slings and load
-    const tx = x + r * c, ty = y + r * s, hx = tx + k.sx, hy = ty + k.sy, h = k.h;
-    const n = [-s * 1.1, c * 1.1];
-    setD(k.cable, seg(P(tx + n[0], ty + n[1], H - 1.4), P(hx + n[0], hy + n[1], h + 6.5)) + seg(P(tx - n[0], ty - n[1], H - 1.4), P(hx - n[0], hy - n[1], h + 6.5)));
-    putC(k.block, rbox(hx, hy, th, -2.6, -2.6, 2.6, 2.6, h + 1, h + 6.5, 1, 0.5));
-    const H2 = (u, z) => P(hx + u * c, hy + u * s, z);
-    setD(k.hook, open([H2(0, h + 1), H2(0, h - 1.2), H2(0.7, h - 2.5), H2(1.9, h - 2.6), H2(2.5, h - 1.6)]));
-    const load = k.job && k.job.state === "carried" ? k.job : null;
-    if (load) {
-      const cc = Math.cos(load.yaw), ss = Math.sin(load.yaw), top = load.z + SZ, hk = P(hx, hy, h - 2);
-      setD(k.sling, [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => seg(hk, P(load.x + 5.9 * u * cc - 3 * v * ss, load.y + 5.9 * u * ss + 3 * v * cc, top))).join(""));
-    } else setD(k.sling, "");
-    k.hookIt.key = depth(hx, hy) + 0.02 + (load ? load.z * 1e-3 : 0);
+    for (let i = 0; i <= n; i += 3) {
+      const z = zb + i * dz;
+      ties += open([W(C[0][0], C[0][1], z), W(C[1][0], C[1][1], z), W(C[2][0], C[2][1], z)]);
+      back += open([W(C[2][0], C[2][1], z), W(C[3][0], C[3][1], z), W(C[0][0], C[0][1], z)]);
+    }
+    ties += open([W(C[0][0], C[0][1], zt), W(C[1][0], C[1][1], zt), W(C[2][0], C[2][1], zt)]);
+    back += open([W(C[2][0], C[2][1], zt), W(C[3][0], C[3][1], zt), W(C[0][0], C[0][1], zt)]);
+    // the ladder runs up inside, just behind the front face
+    const ly = MW - 1.6;
+    lad += seg(W(-1.3, ly, zb), W(-1.3, ly, zt)) + seg(W(1.3, ly, zb), W(1.3, ly, zt));
+    for (let z = zb + 2; z < zt; z += 3.4) lad += seg(W(-1.3, ly, z), W(1.3, ly, z));
+    mk("path", { class: "nf lo", d: back + lad }, g);
+    mk("path", { class: "nf lo", d: side }, g);
+    mk("path", { class: "nf", d: face + ties }, g);
+    let chords = "";
+    for (const q of C.slice(0, 3)) chords += seg(W(q[0], q[1], zb), W(q[0], q[1], zt));
+    mk("path", { class: "nf sil", d: chords }, g);
+    // the mast's feet: base plates bolted down to anchors cast in the pad
+    let plates = "", bolts = "";
+    for (const q of C) {
+      plates += boxFaces(rring(x + q[0], y + q[1], 0, -1.7, -1.7, 1.7, 1.7, 0.4), 2.6, 3.4).sil;
+      for (const [a, b] of [[-1.1, 1.1], [1.1, 1.1]]) bolts += seg(W(q[0] + a, q[1] + b, 3.4), W(q[0] + a, q[1] + b, 4.1));
+    }
+    mk("path", { class: "t4 sil", d: plates }, g);
+    mk("path", { class: "nf", d: bolts }, g);
+    // the near stack of ballast covers the mast's foot
+    ballast(1);
+    item(g, depth(x, y));
   }
 
+  /** The slewing top's elements; drawTop fills them in. */
+  function buildTop(k) {
+    const { x, y, H } = k, t = mk("g", {}, tops);
+    k.top = t;
+    // the slewing ring is round, so it never needs redrawing
+    putBox(shadedBox(t, STEEL), boxFaces(rring(x, y, 0, -6.6, -6.6, 6.6, 6.6, 6.6, 6), H - 1.6, H + 0.3));
+    const g = () => mk("g", {}, t), path = (cls, parent) => mk("path", { class: cls }, parent);
+    const p = (k.parts = {});
+    p.plat = mbox(t, STEEL);
+    p.cab = g(); p.cabBox = mbox(p.cab, STEEL); p.glass = path("t1", p.cab); p.glint = path("nf lo", p.cab);
+    p.cat = g(); p.catFar = path("nf lo", p.cat); p.catNear = path("nf", p.cat); p.catLegs = path("nf sil", p.cat);
+    p.cap = mbox(p.cat, STEEL, true); p.lamp = path("t6 sil", p.cat);
+    p.jib = g(); p.jFar = path("nf lo", p.jib);
+    p.rope = path("nf lo", p.jib); p.trol = mbox(p.jib, STEEL, true); p.wheels = path("t3", p.jib);
+    p.jNearL = path("nf", p.jib); p.jChords = path("nf sil", p.jib);
+    p.cj = g(); p.deck = mbox(p.cj, STEEL); p.railFar = path("nf lo", p.cj);
+    p.drum = g(); p.drumBody = path("t4 sil", p.drum); p.drumEnd = path("sil", p.drum);
+    p.cabinet = mbox(null, STEEL, true); p.cj.appendChild(p.drum); p.cj.appendChild(p.cabinet.g);
+    p.railNear = path("nf", p.cj);
+    p.cw = g(); p.cwBox = mbox(p.cw, WEIGHT); p.seams = path("nf lo", p.cw);
+    p.ties = path("nf", t);
+    // the aviation light on the cathead's peak sits on the axis, so it never moves
+    const lamp = [];
+    for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; lamp.push(P(x + 0.75 * Math.cos(a), y + 0.75 * Math.sin(a), H + 32.3)); }
+    lamp.push(P(x, y, H + 33.6));
+    setD(p.lamp, poly(hull(lamp)));
+  }
+
+  // ---------------------------------------------------------------- drawing
+  /**
+   * The top, in three bands by their reach from the slewing axis: the core (turntable, cab, cathead), the
+   * counter-jib and the jib. A band is redrawn only once its parts have moved a visible amount, so in a slow
+   * slew the core, which hardly moves, is redrawn far less often than the jib.
+   */
+  function drawTop(k, f) {
+    const { x, y, H } = k, p = k.parts, L = basis(x, y, f), c = Math.cos(f), s = Math.sin(f);
+    const dU = c * sA + s * cA, dV = -s * sA + c * cA;   // how much the jib's axis and its left side face the viewer
+    const nv = dV >= 0 ? 1 : -1;                           // the near side
+    const Z0 = H + 3.2, Z1 = H + 10.6, zc0 = H + 3.2, zc1 = H + 29.6;
+    const half = (z) => 4.2 + ((1.3 - 4.2) * (z - zc0)) / (zc1 - zc0);
+    const zt = (u) => (u < JIB - 16 ? Z1 : Z1 + ((Z0 + 2.2 - Z1) * (u - (JIB - 16))) / 16);
+    const bx = (el, u0, v0, u1, v1, z0, z1, r = 1) => mput(el, boxFaces(rring(x, y, f, u0, v0, u1, v1, r), z0, z1));
+
+    // paint order: the arm turned away, the turntable, the cab and cathead by depth, the arm turned toward, the ties
+    const jibNear = dU >= 0, cabFirst = 5.9 * dU + k.cabSide * 9.4 * dV < 0;
+    const order = (jibNear ? 1 : 0) + (cabFirst ? 2 : 0) + (dU < 0 ? 4 : 0) + (nv > 0 ? 8 : 0);
+    let all = false;
+    if (order !== k.order) {
+      k.order = order; all = true;
+      const core = [p.plat.g, ...(cabFirst ? [p.cab, p.cat] : [p.cat, p.cab])];
+      const cj = jibNear ? [p.cw, p.cj] : [p.cj, p.cw];
+      for (const e of jibNear ? [...cj, ...core, p.jib] : [p.jib, ...core, ...cj]) k.top.appendChild(e);
+      // on the counter-jib, the winch and the cabinet in depth order between the rails
+      const [a, b] = dU < 0 ? [p.cabinet.g, p.drum] : [p.drum, p.cabinet.g];
+      p.cj.insertBefore(a, p.railNear); p.cj.insertBefore(b, p.railNear);
+      k.top.appendChild(p.ties);
+    }
+    const due = (i) => {
+      if (!all && k.bands[i] != null && Math.abs(f - k.bands[i]) * BANDS[i] < 0.12) return false;
+      k.bands[i] = f;
+      return true;
+    };
+
+    if (due(0)) {
+      // the turntable
+      bx(p.plat, -7, -6.5, 8, 6.5, H + 0.3, H + 3.2, 1.4);
+      // the operator's cab beside the jib's root, glazed toward the jib and on its outer side
+      const cs = k.cabSide, cv0 = cs > 0 ? 5.6 : -13.2, cv1 = cs > 0 ? 13.2 : -5.6, cu1 = 10.6, ov = cs > 0 ? cv1 : cv0;
+      bx(p.cabBox, 1.2, cv0, cu1, cv1, H - 1.2, H + 10.4, 1);
+      const pane = (u0, v0, u1, v1, z0, z1) => poly([L(u0, v0, z0), L(u1, v1, z0), L(u1, v1, z1), L(u0, v0, z1)]);
+      let glass = "", glint = "";
+      if (dU > 0.06) {
+        const a = cv0 + 0.9, b = cv1 - 0.9, u = cu1 + 0.02;
+        glass += pane(u, a, u, b, H + 0.2, H + 3.5) + pane(u, a, u, b, H + 4.1, H + 9.6);
+        glint += seg(L(u, a + (b - a) * 0.25, H + 4.8), L(u, a + (b - a) * 0.5, H + 8.9));
+      }
+      if (cs * dV > 0.06) {
+        const v = ov + cs * 0.02;
+        glass += pane(3, v, 9.6, v, H + 4.1, H + 9.6);
+        glint += seg(L(4.4, v, H + 4.7), L(6.6, v, H + 9));
+      }
+      setD(p.glass, glass); setD(p.glint, glint);
+      // the cathead: four legs leaning in to the peak, braced on every face; the faces turned away drawn dim
+      const lv = [zc0, H + 12, H + 20.6, zc1], LEG = [[1, 1], [-1, 1], [-1, -1], [1, -1]], dep = (q) => q[0] * dU + q[1] * dV;
+      let far = "", near = "", legs = "", farLeg = 0;
+      for (let i = 1; i < 4; i++) if (dep(LEG[i]) < dep(LEG[farLeg])) farLeg = i;
+      for (let i = 0; i < 4; i++) {
+        const a = LEG[i], b = LEG[(i + 1) % 4];
+        let d = "";
+        for (let j = 0; j < 3; j++) {
+          const z0 = lv[j], z1 = lv[j + 1], h0 = half(z0), h1 = half(z1), [p0, p1] = j % 2 ? [a, b] : [b, a];
+          d += seg(L(p0[0] * h0, p0[1] * h0, z0), L(p1[0] * h1, p1[1] * h1, z1));
+          if (j) d += seg(L(a[0] * h0, a[1] * h0, z0), L(b[0] * h0, b[1] * h0, z0));
+        }
+        if (dep([a[0] + b[0], a[1] + b[1]]) > 0) near += d; else far += d;
+        const leg = seg(L(a[0] * 4.2, a[1] * 4.2, zc0), L(a[0] * 1.3, a[1] * 1.3, zc1));
+        if (i === farLeg) far += leg; else legs += leg;
+      }
+      // the jib's top chord ties into the cathead
+      near += seg(L(JU0, 0, Z1), L(half(Z1), half(Z1), Z1)) + seg(L(JU0, 0, Z1), L(half(Z1), -half(Z1), Z1));
+      setD(p.catFar, far); setD(p.catNear, near); setD(p.catLegs, legs);
+      bx(p.cap, -1.9, -1.9, 1.9, 1.9, zc1, H + 32.3, 0.6);
+    }
+
+    if (due(1)) {
+      // the counter-jib: a walkway with handrails, the hoist winch and its cabinet, and the counterweight slabs at its end
+      bx(p.deck, -46, -3.8, -5, 3.8, H + 3, H + 5, 0.6);
+      const rail = (v) => {
+        let d = open([L(-5.5, v, H + 8.6), L(-45.5, v, H + 8.6)]) + open([L(-5.5, v, H + 6.8), L(-45.5, v, H + 6.8)]);
+        for (let u = -5.5; u >= -45.6; u -= 8) d += seg(L(u, v, H + 5), L(u, v, H + 8.6));
+        return d;
+      };
+      setD(p.railFar, rail(-nv * 3.5)); setD(p.railNear, rail(nv * 3.5));
+      const du = -31, dzc = H + 7.3, dr = 2.1, endA = [], endB = [];
+      for (let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2, cu = du + dr * Math.cos(a), cz = dzc + dr * Math.sin(a);
+        endA.push(L(cu, -nv * 2.5, cz)); endB.push(L(cu, nv * 2.5, cz));
+      }
+      setD(p.drumBody, poly(hull(endA.concat(endB))));
+      setD(p.drumEnd, poly(endB));
+      setClass(p.drumEnd, toneOf([-s * nv, c * nv, 0]));
+      bx(p.cabinet, -24, -2.8, -18.5, 2.8, H + 5, H + 10.6, 0.6);
+      bx(p.cwBox, -58, -5.6, -46, 5.6, H - 7, H + 7.6, 0.6);
+      let seams = "";
+      for (const u of [-55, -52, -49]) seams += open([L(u, -nv * 5.6, H + 7.6), L(u, nv * 5.6, H + 7.6), L(u, nv * 5.6, H - 7)]);
+      setD(p.seams, seams);
+      if (all || Math.abs(f - k.shF[1]) * 62 > 1) { k.shF[1] = f; shadowAt(k.jibShade[1], x - c * 31, y - s * 31, f, 31, 7.5); }
+    }
+
+    if (due(2)) {
+      // the jib: a triangular truss, two bottom chords the trolley runs on and one top chord, laced on all three faces
+      const vN = nv * JV, vF = -nv * JV, top = [L(JU0, 0, Z1)], nearZ = [], farZ = [], bot = [];
+      for (let i = 0; i <= NP; i++) {
+        const u = JU0 + i * PL;
+        nearZ.push(L(u, vN, Z0)); farZ.push(L(u, vF, Z0));
+        bot.push(L(u, i % 2 ? vF : vN, Z0));
+        if (i < NP) { const um = u + PL / 2, q = L(um, 0, zt(um)); top.push(q); nearZ.push(q); farZ.push(q); }
+      }
+      top.push(L(JIB, 0, zt(JIB)));
+      const ends = (u) => open([L(u, vN, Z0), L(u, 0, zt(u)), L(u, vF, Z0), L(u, vN, Z0)]);
+      setD(p.jFar, seg(L(JU0, vF, Z0), L(JIB, vF, Z0)) + open(farZ) + open(bot));
+      setD(p.jNearL, open(nearZ) + ends(JU0) + ends(JIB));
+      setD(p.jChords, seg(L(JU0, vN, Z0), L(JIB, vN, Z0)) + open(top));
+      // pendant ties from the peak to the jib and the counter-jib
+      const A = L(0, 0, H + 31);
+      setD(p.ties, seg(A, L(80, 0, Z1)) + seg(A, L(146, 0, zt(146))) + seg(L(0, 1, H + 30.6), L(-44, 3.5, H + 5)) + seg(L(0, -1, H + 30.6), L(-44, -3.5, H + 5)));
+      // its shadow on the ground, long and faint; being soft it moves in steps of about a unit, which spares repainting the ground every frame
+      if (all || Math.abs(f - k.shF[0]) * 184 > 1) { k.shF[0] = f; shadowAt(k.jibShade[0], x + (c * (JU0 + JIB)) / 2, y + (s * (JU0 + JIB)) / 2, f, (JIB - JU0) / 2 + 8, 5); }
+    }
+  }
+  const setClass = (el, cls) => { if (el.__c !== cls) { el.__c = cls; el.setAttribute("class", cls + " sil"); } };
+  /**
+   * A shaded box that moves: the shade tone under the lit side and the top, then the outline. A small one is
+   * two paths, its sides in the middle tone with the outline, and the lit top laid over them.
+   */
+  function mbox(parent, tones, small) {
+    const g = mk("g", {}, parent);
+    if (small) return { g, base: mk("path", { class: tones[1] + " sil" }, g), left: null, top: mk("path", { class: "fo " + tones[2] }, g), line: null };
+    return {
+      g, base: mk("path", { class: "fo " + tones[0] }, g), left: mk("path", { class: "fo " + tones[1] }, g),
+      top: mk("path", { class: "fo " + tones[2] }, g), line: mk("path", { class: "nf sil" }, g),
+    };
+  }
+  function mput(el, f) { setD(el.base, f.sil); if (el.left) setD(el.left, f.left); setD(el.top, f.top); if (el.line) setD(el.line, f.sil); }
+  /** A soft shadow ellipse on the ground, as a unit circle carried there by a transform, so the gradient keeps its shape. */
+  function shadowAt(el, cx, cy, f, a, b) {
+    const c = Math.cos(f), s = Math.sin(f);
+    const m = [a * (c * EX[0] + s * EY[0]), a * (c * EX[1] + s * EY[1]), b * (-s * EX[0] + c * EY[0]), b * (-s * EX[1] + c * EY[1])];
+    const tr = `matrix(${m.map(r3).join(" ")} ${r3(O[0] + cx * EX[0] + cy * EY[0])} ${r3(O[1] + cx * EX[1] + cy * EY[1])})`;
+    if (el.__t !== tr) { el.__t = tr; el.setAttribute("transform", tr); }
+  }
+
+  /** The trolley under the jib: its frame, wheels on the bottom chords, the sheaves the hoist rope runs over, and that rope along the jib. */
+  function drawTrolley(k, f) {
+    const { x, y, H, r } = k, p = k.parts, L = basis(x, y, f), c = Math.cos(f), s = Math.sin(f);
+    const nv = -s * sA + c * cA >= 0 ? 1 : -1;
+    mput(p.trol, boxFaces(rring(x, y, f, r - 3.4, -4.3, r + 3.4, 4.3, 0.8), H - 0.8, H + 2.2));
+    let d = "";
+    for (const du of [-2.2, 2.2]) {
+      const w = [];
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; w.push(L(r + du + 0.8 * Math.cos(a), nv * 4.3, H + 2.9 + 0.8 * Math.sin(a))); }
+      d += poly(w);
+    }
+    let sh = d;
+    for (const du of [-1.3, 1.3]) {
+      const w = [];
+      for (let i = 0; i < 8; i++) { const a = (i / 8) * Math.PI * 2; w.push(L(r + du + 0.9 * Math.cos(a), nv * 4.32, H + 0.5 + 0.9 * Math.sin(a))); }
+      sh += poly(w);
+    }
+    setD(p.wheels, sh);
+    // the hoist rope comes over the jib's root to the trolley, and runs on from it to its anchor at the tip
+    const zr = H + 3.6;
+    setD(p.rope, seg(L(JU0 + 1, 0, zr), L(r - 3.4, 0, H + 1.4)) + seg(L(r + 3.4, 0, H + 1.4), L(JIB - 4, 0, zr)));
+  }
+
+  /** The hook: its rope in two falls, the hook block and the hook with its latch, and the slings of a load. */
+  function drawHook(k, f) {
+    const { x, y, H } = k, c = Math.cos(f), s = Math.sin(f), r = k.tr;
+    const [hx, hy] = hookAt(k), hz = k.hz, load = k.job && k.job.state === "carried" ? k.job : null;
+    const key = `${Math.round(f * 1e4)},${Math.round(k.tf * 1e4)},${Math.round(r * 50)},${Math.round(hx * 50)},${Math.round(hy * 50)},${Math.round(hz * 50)},${load ? Math.round(load.yaw * 1e3) : "-"}`;
+    k.hookIt.key = depth(hx, hy) + 0.02 + (load ? load.z * 1e-3 : 0);
+    if (key === k.dH) return;
+    k.dH = key;
+    const nv = -s * sA + c * cA >= 0 ? 1 : -1, L = basis(hx, hy, f), T = basis(x, y, k.tf);
+    setD(k.rope, seg(T(r - 1.3, 0, H - 0.8), L(-1.3, 0, hz + 7.3)) + seg(T(r + 1.3, 0, H - 0.8), L(1.3, 0, hz + 7.3)));
+    mput(k.block, boxFaces(rring(hx, hy, f, -2.6, -1.3, 2.6, 1.3, 1), hz + 1.7, hz + 7.3));
+    const sh = [];
+    for (let i = 0; i < 10; i++) { const a = (i / 10) * Math.PI * 2; sh.push(L(1.6 * Math.cos(a), nv * 1.32, hz + 5.1 + 1.6 * Math.sin(a))); }
+    const hc = Math.cos(HOOK_PLANE), hs = Math.sin(HOOK_PLANE), Hk = (a, z) => P(hx + a * hc, hy + a * hs, hz + z);
+    // the hook, and the cover plate of the block's sheave
+    setD(k.hook, poly(HOOK.map(([a, z]) => Hk(a, z))) + poly(sh));
+    const latch = seg(Hk(1.3, -0.45), Hk(0.15, 0.35));
+    if (load) {
+      const cc = Math.cos(load.yaw), ss = Math.sin(load.yaw), top = load.z + SZ + (load.hover || 0), hk = Hk(0.6, -1.95);
+      setD(k.sling, latch + [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([u, v]) => seg(hk, P(load.x + 5.9 * u * cc - 3 * v * ss, load.y + 5.9 * u * ss + 3 * v * cc, top))).join(""));
+      k.hookShade.set(hx, hy, 0, 0, 0, 0);
+    } else {
+      setD(k.sling, latch);
+      const lift = clamp(hz / 130, 0, 1);
+      k.hookShade.set(hx, hy, 3.6 + 3 * lift, 3 + 2.5 * lift, f, 0.32 * (1 - lift) * (1 - lift) + 0.03);
+    }
+  }
+
+  /** full: the top too. The hook is drawn every frame; its rope hangs from the trolley where it was last drawn. */
+  function drawCrane(k, full) {
+    const f = k.th + k.flex, fk = Math.round(f * 1e4);
+    if (full || k.dF == null) {
+      if (fk !== k.dF) { k.dF = fk; drawTop(k, f); }
+      if (k.dR == null || Math.abs(k.r - k.tr) > 0.02 || Math.abs(f - k.tf) * k.r > 0.12) { k.dR = 1; k.tf = f; k.tr = k.r; drawTrolley(k, f); }
+    }
+    drawHook(k, f);
+  }
+
+  // ---------------------------------------------------------------- the jobs
   /** The trolley's radius and the jib's angle that put the hook over (px, py). */
   const polar = (k, px, py) => [Math.atan2(py - k.y, px - k.x), Math.hypot(px - k.x, py - k.y)];
 
@@ -1693,7 +2595,55 @@ function siteCranes(ctx, B) {
     );
   }
 
+  /** The pendulum's length: the rope's, from the trolley's sheaves to the middle of the hook block, and a little more with a load on its slings. */
+  const swingLength = (k) => Math.max(8, k.H - 5.3 - k.h + (k.job && k.job.state === "carried" ? 6 : 0));
+
+  /** How far the hook swings: its offset and speed off the trolley, as one amplitude. */
+  const swingSize = (k) => {
+    const L = swingLength(k), w2 = G / L;
+    return L * Math.sqrt(k.ax * k.ax + k.ay * k.ay + (k.avx * k.avx + k.avy * k.avy) / w2);
+  };
+
   const parked = (k) => Math.abs(wrap(k.park - k.th)) < 0.01 && Math.abs(k.r - 64) < 0.5 && Math.abs(k.h - SAFE) < 0.5;
+
+  // ---------------------------------------------------------------- the drives
+  /**
+   * A jerk-limited move over D: the speed rises along a smoothstep to its peak, cruises, and falls the
+   * same way, so the acceleration rises and falls smoothly too. A short move never reaches full speed.
+   */
+  function move(D, lim) {
+    const d = Math.abs(D);
+    if (d < 1e-6) return null;
+    let vp = lim.v, Ta = (1.5 * vp) / lim.a;
+    if (d < vp * Ta) { vp = Math.sqrt((d * lim.a) / 1.5); Ta = (1.5 * vp) / lim.a; }
+    const Tc = (d - vp * Ta) / vp;
+    return { d, sg: Math.sign(D), vp, Ta, Tc, T: 2 * Ta + Tc };
+  }
+  /**
+   * The same move as a good operator drives it with a load on the hook: the slowing starts a whole number
+   * of the pendulum's periods Tp after the speeding up, so the swing the start gave is taken back by the
+   * stop and the hook arrives hanging still.
+   */
+  function shaped(D, lim, Tp) {
+    const d = Math.abs(D);
+    if (d < 1e-6) return null;
+    for (let n = 1; n <= 6; n++) {
+      const S = n * Tp, vp = d / S, Ta = Math.max((1.5 * vp) / lim.a, Math.min(0.3 * S, 0.7));
+      if (vp <= lim.v && Ta <= S) return { d, sg: Math.sign(D), vp, Ta, Tc: S - Ta, T: S + Ta };
+    }
+    return move(D, lim);
+  }
+  /** Where a move is at time t, and how fast it goes: [distance, speed]. */
+  function at(m, t) {
+    if (!m) return [0, 0];
+    t = clamp(t, 0, m.T);
+    const ramp = (q) => { const u = q / m.Ta, u3 = u * u * u; return [m.vp * m.Ta * (u3 - (u3 * u) / 2), m.vp * (3 * u * u - 2 * u3)]; };
+    let x, v;
+    if (t < m.Ta) [x, v] = ramp(t);
+    else if (t < m.Ta + m.Tc) { x = (m.vp * m.Ta) / 2 + m.vp * (t - m.Ta); v = m.vp; }
+    else { const q = ramp(m.T - t); x = m.d - q[0]; v = q[1]; }
+    return [m.sg * x, m.sg * v];
+  }
 
   function craneStep(k, dt) {
     // an idle wait gives way at once to new work
@@ -1708,16 +2658,29 @@ function siteCranes(ctx, B) {
       const st = k.steps.shift();
       st.t = 0;
       st.f = { th: k.th, r: k.r, h: k.h };
-      if (st.th != null) { st.dth = wrap(st.th - k.th); st.dur = Math.max(0.9, 0.6 + Math.abs(st.dth) * 1.1 + Math.abs(st.r - k.r) / 90); }
-      else if (st.h != null) st.dur = Math.max(0.5, 0.35 + Math.abs(st.h - k.h) / 55);
+      // slew and trolley run together; each move ends with a short beat as the brakes take it
+      if (st.th != null) {
+        const Tp = 2 * Math.PI * Math.sqrt(swingLength(k) / G);
+        const out = Math.max(k.r, st.r, 20), hv = HOOK_V[k.job && k.job.state === "carried" ? 1 : 0];
+        st.dth = wrap(st.th - k.th);
+        st.ms = shaped(st.dth, { v: Math.min(SLEW.v, hv / out), a: Math.min(SLEW.a, HOOK_A / out) }, Tp);
+        st.mr = shaped(st.r - k.r, { v: hv, a: TROLLEY_A }, Tp);
+        st.run = Math.max(st.ms ? st.ms.T : 0, st.mr ? st.mr.T : 0);
+        st.dur = Math.max(0.3, st.run + 0.15);
+      } else if (st.h != null) { st.mh = move(st.h - k.h, HOIST); st.dur = Math.max(0.25, (st.mh ? st.mh.T : 0) + 0.1); }
       else st.dur = st.wait;
       k.cur = st;
     }
     const st = k.cur;
     st.t += dt;
-    const e = smooth(clamp(st.t / st.dur, 0, 1));
-    if (st.th != null) { k.th = st.f.th + st.dth * e; k.r = lerp(st.f.r, st.r, e); }
-    if (st.h != null) k.h = lerp(st.f.h, st.h, e);
+    k.w = k.vr = k.vh = 0;
+    if (st.th != null) {
+      const a = at(st.ms, st.t), b = at(st.mr, st.t);
+      k.th = st.f.th + a[0]; k.w = a[1]; k.r = st.f.r + b[0]; k.vr = b[1];
+    }
+    if (st.h != null) { const a = at(st.mh, st.t); k.h = st.f.h + a[0]; k.vh = a[1]; }
+    // after a slew the operator lets the hook settle before lowering, for at most a second or so
+    if (st.t >= st.dur && st.th != null && st.t < st.dur + 1.2 && swingSize(k) > 1) return;
     if (st.t >= st.dur) {
       k.cur = null;
       // checked at every step's end, before its hook or release runs
@@ -1726,31 +2689,92 @@ function siteCranes(ctx, B) {
     }
   }
 
-  /** The load swings on its cable: a pendulum driven by the trolley's acceleration, held still near the ground. */
-  function swing(k, dt) {
-    const tx = k.x + k.r * Math.cos(k.th), ty = k.y + k.r * Math.sin(k.th);
-    if (!k.tp) k.tp = [tx, ty];
-    const vx = (tx - k.tp[0]) / dt, vy = (ty - k.tp[1]) / dt, ax = (vx - k.tv[0]) / dt, ay = (vy - k.tv[1]) / dt;
-    k.tp = [tx, ty]; k.tv = [vx, vy];
-    const damp = k.h < SAFE - 8 ? 7 : 0.9;
-    k.svx += (-9 * k.sx - damp * k.svx - clamp(ax, -400, 400)) * dt;
-    k.svy += (-9 * k.sy - damp * k.svy - clamp(ay, -400, 400)) * dt;
-    k.sx = clamp(k.sx + k.svx * dt, -6, 6);
-    k.sy = clamp(k.sy + k.svy * dt, -6, 6);
-    const b = k.job;
-    if (b && b.state === "carried") {
-      b.x = tx + k.sx; b.y = ty + k.sy; b.z = k.h - 2 - SL - SZ;
-      b.yaw = wrap(b.yaw) * Math.max(0, 1 - dt * 1.4);
+  /**
+   * What the drives do to the steel and the load: the top sways on the mast as a slew starts and stops; the
+   * hook is a pendulum from the trolley, driven by the trolley's acceleration, with a period set by the rope's
+   * length; the rope stretches a little as a hoist starts and stops; and a load twists on its slings until the
+   * riggers square it up. Near the ground the riggers' hands and tag lines steady it.
+   */
+  function physics(k, dt) {
+    if (dt <= 0) return;
+    // sway: the slew's angular acceleration bends the top on its mast
+    const al = clamp((k.w - k.pw) / dt, -2, 2);
+    k.pw = k.w;
+    k.fv += (-SWAY_W * SWAY_W * k.flex - 2 * SWAY_Z * SWAY_W * k.fv - SWAY_K * al) * dt;
+    k.flex += k.fv * dt;
+    if (Math.abs(k.flex) < 1e-5 && Math.abs(k.fv) < 1e-5) k.flex = k.fv = 0;
+
+    // the trolley's acceleration in the jib's own frame: along the jib (less the pull of the turn) and across it
+    const f = k.th + k.flex, c = Math.cos(f), s = Math.sin(f), om = k.w + k.fv;
+    const omd = (om - k.pom) / dt, rdd = (k.vr - k.pvr) / dt;
+    k.pom = om; k.pvr = k.vr;
+    const aR = clamp(rdd - k.r * om * om, -150, 150), aT = clamp(k.r * omd + 2 * k.vr * om, -150, 150);
+
+    // the pendulum: from the trolley's sheaves to the hook block, or to the middle of the load
+    const b = k.job && k.job.state === "carried" ? k.job : null, Lp = swingLength(k);
+    const Ld = k.pL != null && Math.abs(Lp - k.pL) < 3 ? (Lp - k.pL) / dt : 0;
+    k.pL = Lp;
+    const w2 = G / Lp, low = k.cur && k.cur.low, reach = b ? k.h - 2 - SL - SZ : k.h - 2;
+    // air and the rope damp it a little; a slow approach and tag lines more; hands on the load near the ground most
+    // while a shaped move runs the operator leaves the swing alone, as its stop takes it back; once stopped the anti-sway catches what is left
+    const moving = k.cur && k.cur.th != null;
+    let damp = moving ? (k.cur.t < k.cur.run ? 0.04 : 2.4) : 0.3, hold = 0;
+    if (low) damp = 2.2;
+    if (low && reach < 22) damp = 3.5;
+    if (low && k.cur.wait) { damp = 7; hold = 14; }
+    // the swing is worked in the jib's frame (ax along it, ay across), so it turns with the jib; at these slew rates the Coriolis pull is left out
+    const step = (a, v, acc) => v + (-(w2 + hold) * a - acc / Lp - (2 * Ld / Lp) * v - damp * v) * dt;
+    k.avx = step(k.ax, k.avx, aR); k.avy = step(k.ay, k.avy, aT);
+    k.ax = clamp(k.ax + k.avx * dt, -0.3, 0.3); k.ay = clamp(k.ay + k.avy * dt, -0.3, 0.3);
+    if (Math.abs(k.ax) + Math.abs(k.ay) + Math.abs(k.avx) + Math.abs(k.avy) < 2e-5) k.ax = k.ay = k.avx = k.avy = 0;
+    // the hook's offset from where the drives alone would put it: the jib's sway plus the swing
+    const qa = Lp * Math.sin(k.ax), qc = Lp * Math.sin(k.ay);
+    k.sx = k.r * (c - Math.cos(k.th)) + qa * c - qc * s;
+    k.sy = k.r * (s - Math.sin(k.th)) + qa * s + qc * c;
+
+    // the rope stretches as a hoist speeds up or slows: the hook bobs, more so with a load
+    const ah = clamp((k.vh - k.pvh) / dt, -300, 300);
+    k.pvh = k.vh;
+    if (b && k.held !== b) {
+      // the load is hooked: the rope takes its weight with a small dip, and it starts to turn on its slings
+      k.held = b; k.lifts++;
+      b.yaw = wrap(b.yaw);
+      k.yv = (hash(k.lifts * 7 + k.x) - 0.5) * 0.3;
+      k.bv -= 4;
+    } else if (!b) k.held = null;
+    const wz = b ? 15 : 21;
+    k.bv += (-wz * wz * k.bz - 2 * 0.22 * wz * k.bv - ah) * dt;
+    k.bz += k.bv * dt;
+    if (Math.abs(k.bz) < 1e-4 && Math.abs(k.bv) < 1e-3) k.bz = k.bv = 0;
+    let hz = k.h + k.bz;
+    if (b) {
+      // the load hangs from the hook; it cannot sink into the ground or into the bed of its slot
+      const [hx, hy] = hookAt(k), floor = k.mode === "place" && low ? b.slot.z0 : 0;
+      b.x = hx; b.y = hy; b.z = Math.max(floor, hz - 2 - SL - SZ);
+      const held = b.z + 2 + SL + SZ;
+      // resting on the ground or its bed, the load holds the rope: the stretch stays where the rest leaves it
+      if (held > hz) { k.bz = held - k.h; k.bv = Math.max(k.bv, 0); }
+      hz = held;
+      // it twists on its slings and settles square
+      k.yv += (-3.2 * b.yaw - 1.8 * k.yv) * dt;
+      b.yaw += k.yv * dt;
     }
+    k.hz = hz;
   }
 
   const cranes = CRANES.map(makeCrane);
   if (depth(cranes[0].x, cranes[0].y) > depth(cranes[1].x, cranes[1].y)) tops.appendChild(cranes[0].top);
 
+  // When frames come slower than 50 a second the two tops take turns, each redrawn every other frame; a skip ahead or a still draws all
+  let since = 0, turn = 0;
   return {
     cranes, polar, hookAt,
-    update(dt) { for (const k of cranes) { craneStep(k, dt); swing(k, dt); } },
-    draw() { for (const k of cranes) drawCrane(k); },
+    update(dt) { since += dt; for (const k of cranes) { craneStep(k, dt); physics(k, dt); } },
+    draw() {
+      const slow = since > 1 / 50 && since < 0.1 && !still();
+      since = 0; turn ^= 1;
+      cranes.forEach((k, i) => drawCrane(k, !slow || i === turn));
+    },
   };
 }
 

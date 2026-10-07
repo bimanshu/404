@@ -60,16 +60,27 @@ function construction404(stage, svg, opts = {}) {
     if (o.byReader) {
       story.knocked += stack.length; story.byReader = true;
       onKnock(story.knocked);
-      onAnnounce(stack.length === 1 ? "You knocked out a block. A crane will put it back." : `You knocked out ${stack.length} blocks. A crane will put them back.`);
+      const one = stack.length === 1;
+      onAnnounce(still()
+        ? (one ? "You knocked out a block. Press Enter or tap its outline to put it back." : `You knocked out ${stack.length} blocks. Press Enter or tap an outline to put them back.`)
+        : (one ? "You knocked out a block. A crane will put it back." : `You knocked out ${stack.length} blocks. A crane will put them back.`));
     }
     return stack.length;
   }
 
-  /** Without motion there is no crane to watch, so a block that is out goes straight back. */
+  /**
+   * Without motion there is no crane to watch, so a block that is out goes straight back, with every block
+   * out below it in its column, so nothing is ever set above a gap. A crane that had one of them as its job lets go.
+   */
   function putBack(s) {
-    Object.assign(s.block, { state: "slot", x: s.cx, y: s.cy, z: s.z0, yaw: 0 });
-    story.placed++;
-    onAnnounce("The block is back in place.");
+    const run = slots.filter((q) => q.col === s.col && q.lvl <= s.lvl && q.block.state !== "slot").sort((a, b) => a.lvl - b.lvl);
+    for (const q of run) {
+      const b = q.block;
+      for (const k of cranes) if (k.job === b) Object.assign(k, { job: null, mode: null, spot: null, steps: [], cur: null });
+      Object.assign(b, { state: "slot", x: q.cx, y: q.cy, z: q.z0, yaw: 0, fall: null });
+      story.placed++;
+    }
+    onAnnounce(run.length === 1 ? "The block is back in place." : `${run.length} blocks are back in place.`);
   }
 
   function director(dt) {
@@ -114,6 +125,7 @@ function construction404(stage, svg, opts = {}) {
 
   let read = "";
   function draw() {
+    if (hover && !isIn(hover)) { hover = null; stage.style.cursor = ""; }
     B.draw(active());
     CR.draw();
     PE.draw();
@@ -129,7 +141,9 @@ function construction404(stage, svg, opts = {}) {
   // ---------------------------------------------------------------- life
   const advance = (sec) => { let left = sec; while (left > 1e-6) { const h = Math.min(left, 1 / 90); sim(h); left -= h; } };
   advance(Math.max(0, opts.t || 0));
-  if (reducedMotion() && !opts.t) advance(8.6); // a still with both cranes at work
+  // a still with both cranes at work; the kernel learns about reduced motion only inside register, so ask directly too
+  const prefersStill = reducedMotion() || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (prefersStill && !opts.t) advance(8.6);
   // the block under the pointer, and the one picked with the keys
   let hover = null, sel = null;
   const active = () => hover || sel;
@@ -176,14 +190,17 @@ function construction404(stage, svg, opts = {}) {
   bag.on(stage, "pointerdown", (e) => {
     if (e.button !== 0) return;
     const p = toView(e), finger = e.pointerType !== "mouse";
-    const s = slotAtPoint(p, isIn, finger);
+    // the outline under the point decides; a finger's nearest-block guess comes only after both outlines miss
+    const exactIn = slotAtPoint(p, isIn, false), exactOut = !exactIn && still() ? slotAtPoint(p, isOut, false) : null;
+    const s = exactIn || (!exactOut && finger ? slotAtPoint(p, isIn, true) : null);
     if (s) { knockOut(s, { byReader: true }); hover = null; stage.style.cursor = ""; poke(); return; }
-    if (still()) { const g = slotAtPoint(p, isOut, finger); if (g) { putBack(g); poke(); } }
+    const g = exactOut || (still() && finger ? slotAtPoint(p, isOut, true) : null);
+    if (g) { putBack(g); poke(); }
   });
 
   // ---- the keys: arrows walk the blocks, Enter or Space knocks one out
   const DIRS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
-  function walk(from, [dc, dl]) {
+  function walk(from, [dc, dl] = [0, 0]) {
     if (!from) return slots.filter(isIn).sort((a, b) => Math.hypot(a.col - 5, a.lvl - 2) - Math.hypot(b.col - 5, b.lvl - 2))[0] || slots[0];
     let best = null, score = 0;
     for (const s of slots) {
@@ -194,12 +211,13 @@ function construction404(stage, svg, opts = {}) {
     }
     return best || from;
   }
-  const say = (s) => onAnnounce(isIn(s) ? "Block in place. Press Enter to knock it out." : "Block out. A crane will put it back.");
+  const say = (s) => onAnnounce(isIn(s) ? "Block in place. Press Enter to knock it out." : still() ? "Block out. Press Enter to put it back." : "Block out. A crane will put it back.");
   bag.on(stage, "keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (DIRS[e.key]) { e.preventDefault(); sel = walk(sel, DIRS[e.key]); say(sel); poke(); return; }
+    if (DIRS[e.key]) { e.preventDefault(); if (hover) setHover(null); sel = walk(sel, DIRS[e.key]); say(sel); poke(); return; }
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      if (hover) setHover(null);
       if (!sel) { sel = walk(null); say(sel); }
       else if (isIn(sel)) knockOut(sel, { byReader: true });
       else if (still() && isOut(sel)) putBack(sel);

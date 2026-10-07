@@ -69,7 +69,8 @@ function siteBlocks(ctx) {
   }
 
   const isIn = (s) => s.block.state === "slot";
-  const isOut = (s) => s.block.state === "ground";
+  /** Out of the 404: on the ground, falling, or on a hook. Only the still mode's put-back reads it. */
+  const isOut = (s) => s.block.state !== "slot";
   /** A slot can take its block only once every slot below it in its column is filled, so nothing is ever set above a gap. */
   const placeable = (s) => slots.every((o) => o.col !== s.col || o.lvl >= s.lvl || o.block.state === "slot");
 
@@ -89,14 +90,22 @@ function siteBlocks(ctx) {
   function findSpot(s, k) {
     const t = taken();
     const keep = [[...PILE, 28], [...MIXER, 26], [...PALLET, 22], [124, 100, 14], [180, 100, 14], [206, 90, 14], [...DUMP, 18], ...ctx.cranes.map((c) => [c.x, c.y, 28])];
-    let best = null;
+    const yaw = ((story.seq * 47) % 50) - 25;
+    let best = null, roomiest = null;
     for (let x = -44; x <= 206; x += 7) for (let y = 30; y <= 94; y += 8) {
       const d = Math.hypot(x - k.x, y - k.y);
-      if (d < 32 || d > JIB - 12 || !clear(x, y, t) || keep.some(([kx, ky, r]) => Math.hypot(x - kx, y - ky) < r)) continue;
-      const score = Math.abs(x - s.cx) + Math.abs(y - 44) * 1.6;
-      if (!best || score < best[3]) best = [x, y, ((story.seq * 47) % 50) - 25, score];
+      // in the crane's reach (a trolley can't run past the jib's end or into the mast) and clear of the props and paths
+      if (d < 32 || d > JIB - 12 || keep.some(([kx, ky, r]) => Math.hypot(x - kx, y - ky) < r)) continue;
+      if (clear(x, y, t)) {
+        const score = Math.abs(x - s.cx) + Math.abs(y - 44) * 1.6;
+        if (!best || score < best[3]) best = [x, y, yaw, score];
+      } else {
+        // when every clear spot is taken, the one farthest from its nearest neighbour
+        const room = Math.min(...t.map(([tx, ty]) => Math.hypot(x - tx, y - ty)));
+        if (!roomiest || room > roomiest[3]) roomiest = [x, y, yaw, room];
+      }
     }
-    return best ? best.slice(0, 3) : [s.cx, 22, 0];
+    return (best || roomiest || [s.cx, 22, 0, 0]).slice(0, 3);
   }
 
   const debris = [];

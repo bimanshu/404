@@ -31,7 +31,7 @@
     :root:not([data-theme="light"]) {
       color-scheme: dark;
       --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
-      --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
+      --line-edge: oklch(0.5 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
       --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260); --block-shade: oklch(0.255 0.007 260);
       --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
       --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
@@ -42,7 +42,7 @@
   :root[data-theme="dark"] {
     color-scheme: dark;
     --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
-    --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
+    --line-edge: oklch(0.5 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
     --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260); --block-shade: oklch(0.255 0.007 260);
     --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
     --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
@@ -73,6 +73,8 @@
     --hairline-mid: var(--line-mid); --hairline-lo: var(--line-lo);
   }
   .stage[data-frame="core"] { width: min(100%, calc(80svh * var(--aspect))); border-radius: 0; }
+  /* on a tall screen the ground runs on past the stage's top and bottom instead of stopping on a hard line */
+  .stage[data-frame="core"] > svg { overflow: visible; clip-path: inset(-100vh 0); }
   .stage .blk { fill: var(--block-face); }
   .stage .blk-top { fill: var(--block-top); }
   .stage .loose .blk { fill: var(--loose-face); }
@@ -119,7 +121,7 @@
   </svg>
 </button>
 <main>
-  <div class="stage" id="stage" data-hairline="construction-404" role="img" tabindex="0"
+  <div class="stage" id="stage" data-hairline="construction-404" role="application" aria-roledescription="construction site" tabindex="0"
        aria-label="Page not found. A broken 404 built of blocks, with two tower cranes putting the missing blocks back. Click or tap a block to knock it out, or use the arrow keys to pick one and press Enter."></div>
   <h1 class="sr-only">This page is under construction</h1>
   <p class="sr-only" id="live" aria-live="polite"></p>
@@ -1068,7 +1070,8 @@ function siteBlocks(ctx) {
   }
 
   const isIn = (s) => s.block.state === "slot";
-  const isOut = (s) => s.block.state === "ground";
+  /** Out of the 404: on the ground, falling, or on a hook. Only the still mode's put-back reads it. */
+  const isOut = (s) => s.block.state !== "slot";
   /** A slot can take its block only once every slot below it in its column is filled, so nothing is ever set above a gap. */
   const placeable = (s) => slots.every((o) => o.col !== s.col || o.lvl >= s.lvl || o.block.state === "slot");
 
@@ -1088,14 +1091,22 @@ function siteBlocks(ctx) {
   function findSpot(s, k) {
     const t = taken();
     const keep = [[...PILE, 28], [...MIXER, 26], [...PALLET, 22], [124, 100, 14], [180, 100, 14], [206, 90, 14], [...DUMP, 18], ...ctx.cranes.map((c) => [c.x, c.y, 28])];
-    let best = null;
+    const yaw = ((story.seq * 47) % 50) - 25;
+    let best = null, roomiest = null;
     for (let x = -44; x <= 206; x += 7) for (let y = 30; y <= 94; y += 8) {
       const d = Math.hypot(x - k.x, y - k.y);
-      if (d < 32 || d > JIB - 12 || !clear(x, y, t) || keep.some(([kx, ky, r]) => Math.hypot(x - kx, y - ky) < r)) continue;
-      const score = Math.abs(x - s.cx) + Math.abs(y - 44) * 1.6;
-      if (!best || score < best[3]) best = [x, y, ((story.seq * 47) % 50) - 25, score];
+      // in the crane's reach (a trolley can't run past the jib's end or into the mast) and clear of the props and paths
+      if (d < 32 || d > JIB - 12 || keep.some(([kx, ky, r]) => Math.hypot(x - kx, y - ky) < r)) continue;
+      if (clear(x, y, t)) {
+        const score = Math.abs(x - s.cx) + Math.abs(y - 44) * 1.6;
+        if (!best || score < best[3]) best = [x, y, yaw, score];
+      } else {
+        // when every clear spot is taken, the one farthest from its nearest neighbour
+        const room = Math.min(...t.map(([tx, ty]) => Math.hypot(x - tx, y - ty)));
+        if (!roomiest || room > roomiest[3]) roomiest = [x, y, yaw, room];
+      }
     }
-    return best ? best.slice(0, 3) : [s.cx, 22, 0];
+    return (best || roomiest || [s.cx, 22, 0, 0]).slice(0, 3);
   }
 
   const debris = [];
@@ -1703,16 +1714,27 @@ function construction404(stage, svg, opts = {}) {
     if (o.byReader) {
       story.knocked += stack.length; story.byReader = true;
       onKnock(story.knocked);
-      onAnnounce(stack.length === 1 ? "You knocked out a block. A crane will put it back." : `You knocked out ${stack.length} blocks. A crane will put them back.`);
+      const one = stack.length === 1;
+      onAnnounce(still()
+        ? (one ? "You knocked out a block. Press Enter or tap its outline to put it back." : `You knocked out ${stack.length} blocks. Press Enter or tap an outline to put them back.`)
+        : (one ? "You knocked out a block. A crane will put it back." : `You knocked out ${stack.length} blocks. A crane will put them back.`));
     }
     return stack.length;
   }
 
-  /** Without motion there is no crane to watch, so a block that is out goes straight back. */
+  /**
+   * Without motion there is no crane to watch, so a block that is out goes straight back, with every block
+   * out below it in its column, so nothing is ever set above a gap. A crane that had one of them as its job lets go.
+   */
   function putBack(s) {
-    Object.assign(s.block, { state: "slot", x: s.cx, y: s.cy, z: s.z0, yaw: 0 });
-    story.placed++;
-    onAnnounce("The block is back in place.");
+    const run = slots.filter((q) => q.col === s.col && q.lvl <= s.lvl && q.block.state !== "slot").sort((a, b) => a.lvl - b.lvl);
+    for (const q of run) {
+      const b = q.block;
+      for (const k of cranes) if (k.job === b) Object.assign(k, { job: null, mode: null, spot: null, steps: [], cur: null });
+      Object.assign(b, { state: "slot", x: q.cx, y: q.cy, z: q.z0, yaw: 0, fall: null });
+      story.placed++;
+    }
+    onAnnounce(run.length === 1 ? "The block is back in place." : `${run.length} blocks are back in place.`);
   }
 
   function director(dt) {
@@ -1757,6 +1779,7 @@ function construction404(stage, svg, opts = {}) {
 
   let read = "";
   function draw() {
+    if (hover && !isIn(hover)) { hover = null; stage.style.cursor = ""; }
     B.draw(active());
     CR.draw();
     PE.draw();
@@ -1772,7 +1795,9 @@ function construction404(stage, svg, opts = {}) {
   // ---------------------------------------------------------------- life
   const advance = (sec) => { let left = sec; while (left > 1e-6) { const h = Math.min(left, 1 / 90); sim(h); left -= h; } };
   advance(Math.max(0, opts.t || 0));
-  if (reducedMotion() && !opts.t) advance(8.6); // a still with both cranes at work
+  // a still with both cranes at work; the kernel learns about reduced motion only inside register, so ask directly too
+  const prefersStill = reducedMotion() || (typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches);
+  if (prefersStill && !opts.t) advance(8.6);
   // the block under the pointer, and the one picked with the keys
   let hover = null, sel = null;
   const active = () => hover || sel;
@@ -1819,14 +1844,17 @@ function construction404(stage, svg, opts = {}) {
   bag.on(stage, "pointerdown", (e) => {
     if (e.button !== 0) return;
     const p = toView(e), finger = e.pointerType !== "mouse";
-    const s = slotAtPoint(p, isIn, finger);
+    // the outline under the point decides; a finger's nearest-block guess comes only after both outlines miss
+    const exactIn = slotAtPoint(p, isIn, false), exactOut = !exactIn && still() ? slotAtPoint(p, isOut, false) : null;
+    const s = exactIn || (!exactOut && finger ? slotAtPoint(p, isIn, true) : null);
     if (s) { knockOut(s, { byReader: true }); hover = null; stage.style.cursor = ""; poke(); return; }
-    if (still()) { const g = slotAtPoint(p, isOut, finger); if (g) { putBack(g); poke(); } }
+    const g = exactOut || (still() && finger ? slotAtPoint(p, isOut, true) : null);
+    if (g) { putBack(g); poke(); }
   });
 
   // ---- the keys: arrows walk the blocks, Enter or Space knocks one out
   const DIRS = { ArrowLeft: [-1, 0], ArrowRight: [1, 0], ArrowUp: [0, 1], ArrowDown: [0, -1] };
-  function walk(from, [dc, dl]) {
+  function walk(from, [dc, dl] = [0, 0]) {
     if (!from) return slots.filter(isIn).sort((a, b) => Math.hypot(a.col - 5, a.lvl - 2) - Math.hypot(b.col - 5, b.lvl - 2))[0] || slots[0];
     let best = null, score = 0;
     for (const s of slots) {
@@ -1837,12 +1865,13 @@ function construction404(stage, svg, opts = {}) {
     }
     return best || from;
   }
-  const say = (s) => onAnnounce(isIn(s) ? "Block in place. Press Enter to knock it out." : "Block out. A crane will put it back.");
+  const say = (s) => onAnnounce(isIn(s) ? "Block in place. Press Enter to knock it out." : still() ? "Block out. Press Enter to put it back." : "Block out. A crane will put it back.");
   bag.on(stage, "keydown", (e) => {
     if (e.metaKey || e.ctrlKey || e.altKey) return;
-    if (DIRS[e.key]) { e.preventDefault(); sel = walk(sel, DIRS[e.key]); say(sel); poke(); return; }
+    if (DIRS[e.key]) { e.preventDefault(); if (hover) setHover(null); sel = walk(sel, DIRS[e.key]); say(sel); poke(); return; }
     if (e.key === "Enter" || e.key === " ") {
       e.preventDefault();
+      if (hover) setHover(null);
       if (!sel) { sel = walk(null); say(sel); }
       else if (isIn(sel)) knockOut(sel, { byReader: true });
       else if (still() && isOut(sel)) putBack(sel);

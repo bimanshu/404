@@ -26,7 +26,7 @@
     :root:not([data-theme="light"]) {
       color-scheme: dark;
       --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
-      --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
+      --line-edge: oklch(0.5 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
       --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260); --block-shade: oklch(0.255 0.007 260);
       --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
       --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
@@ -37,7 +37,7 @@
   :root[data-theme="dark"] {
     color-scheme: dark;
     --bg: oklch(0.16 0.004 260); --ink: oklch(0.9 0.008 255);
-    --line-edge: oklch(0.48 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
+    --line-edge: oklch(0.5 0.01 260); --line-mid: oklch(0.35 0.008 260); --line-lo: oklch(0.27 0.006 260);
     --block-face: oklch(0.31 0.008 260); --block-top: oklch(0.39 0.008 260); --block-shade: oklch(0.255 0.007 260);
     --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
     --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
@@ -68,6 +68,8 @@
     --hairline-mid: var(--line-mid); --hairline-lo: var(--line-lo);
   }
   .stage[data-frame="core"] { width: min(100%, calc(80svh * var(--aspect))); border-radius: 0; }
+  /* on a tall screen the ground runs on past the stage's top and bottom instead of stopping on a hard line */
+  .stage[data-frame="core"] > svg { overflow: visible; clip-path: inset(-100vh 0); }
   .stage .blk { fill: var(--block-face); }
   .stage .blk-top { fill: var(--block-top); }
   .stage .loose .blk { fill: var(--loose-face); }
@@ -113,7 +115,7 @@
   </svg>
 </button>
 <main>
-  <div class="stage" id="stage" data-hairline="construction-404" role="img" tabindex="0"
+  <div class="stage" id="stage" data-hairline="construction-404" role="application" aria-roledescription="construction site" tabindex="0"
        aria-label="Page not found. A broken 404 built of blocks, with two tower cranes putting the missing blocks back. Click or tap a block to knock it out, or use the arrow keys to pick one and press Enter."></div>
   <h1 class="sr-only">This page is under construction</h1>
   <p class="sr-only" id="live" aria-live="polite"></p>

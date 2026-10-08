@@ -390,11 +390,31 @@ function siteCranes(ctx, B) {
     );
   }
 
-  /** A block below the job's slot was knocked out: drop a job not yet hooked, or set the load down on the ground. */
+  /**
+   * A block below the job's slot was knocked out: drop a job not yet hooked. A load already on the hook
+   * goes into the lowest gap in that column instead, and the block that fell from there takes its old place.
+   */
   function abandon(k) {
     const b = k.job;
     k.steps = [];
     if (b.state !== "carried") { k.job = null; k.mode = null; return; }
+    const s = b.slot;
+    let low = null;
+    for (const o of blocks) {
+      const q = o.slot;
+      if (q.col === s.col && q.lvl < s.lvl && o.state !== "slot" && (!low || q.lvl < low.lvl)) low = q;
+    }
+    if (low) {
+      const o = low.block;
+      b.slot = low; low.block = b; o.slot = s; s.block = o;
+      const [th, r] = polar(k, low.cx, low.cy);
+      k.steps.push(
+        { h: SAFE }, { th, r }, { h: low.z0 + SZ + 2 + SL, low: true },
+        { wait: 0.5, low: true, then: () => { Object.assign(b, { state: "slot", x: low.cx, y: low.cy, z: low.z0, yaw: 0 }); k.job = null; k.mode = null; story.placed++; } },
+        { h: SAFE },
+      );
+      return;
+    }
     const spot = findSpot(b.slot, k), [th, r] = polar(k, spot[0], spot[1]);
     k.mode = "setdown"; k.spot = spot;
     k.steps.push(

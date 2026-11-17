@@ -59,7 +59,7 @@ function siteCranes(ctx, B) {
     k.cabSide = -Math.sin(c.park) * sA + Math.cos(c.park) * cA >= 0 ? 1 : -1;
     buildMast(k);
     // the hook, its rope and the rigging: an item, so it paints in depth order with the load
-    const hg = mk("g", {}, layer);
+    const hg = mk("g", { "data-paint": "hook" }, layer);
     k.rope = mk("path", { class: "nf" }, hg);
     k.block = mbox(hg, STEEL, true);
     k.hook = mk("path", { class: "t4 sil" }, hg);
@@ -79,10 +79,14 @@ function siteCranes(ctx, B) {
 
   /** The footing, its ballast and the lattice mast: built once, they never move. */
   function buildMast(k) {
-    const { x, y, H } = k, g = mk("g", {}, layer), W = (u, v, z) => P(x + u, y + v, z);
+    const { x, y, H } = k, g = mk("g", { "data-paint": "crane" }, layer), W = (u, v, z) => P(x + u, y + v, z);
     makeShadow().set(x, y, 21, 21, 0, 0.42);
-    const box = (tones, u0, v0, u1, v1, z0, z1, r, b) => putBox(shadedBox(g, tones), boxFaces(rring(x, y, 0, u0, v0, u1, v1, r), z0, z1,
-      b ? rring(x, y, 0, u0 + b, v0 + b, u1 - b, v1 - b, Math.max(0.3, r - b)) : null));
+    // the pad and the ballast are cast concrete, not painted steel
+    const box = (tones, u0, v0, u1, v1, z0, z1, r, b) => {
+      const el = shadedBox(g, tones);
+      el.g.setAttribute("data-paint", "concrete");
+      putBox(el, boxFaces(rring(x, y, 0, u0, v0, u1, v1, r), z0, z1, b ? rring(x, y, 0, u0 + b, v0 + b, u1 - b, v1 - b, Math.max(0.3, r - b)) : null));
+    };
     const ballast = (side) => { for (let i = 0; i < 2; i++) box(WEIGHT, side * 10.2 - 2.7, -11.5, side * 10.2 + 2.7, 11.5, 2.6 + i * 3.1, 2.5 + (i + 1) * 3.1, 0.7, 0.5); };
     // the cast pad, and the ballast stack behind the mast
     box(CONC, -15, -15, 15, 15, 0, 2.6, 2.4, 1);
@@ -129,7 +133,7 @@ function siteCranes(ctx, B) {
 
   /** The slewing top's elements; drawTop fills them in. */
   function buildTop(k) {
-    const { x, y, H } = k, t = mk("g", {}, tops);
+    const { x, y, H } = k, t = mk("g", { "data-paint": "crane" }, tops);
     k.top = t;
     // the slewing ring is round, so it never needs redrawing
     putBox(shadedBox(t, STEEL), boxFaces(rring(x, y, 0, -6.6, -6.6, 6.6, 6.6, 6.6, 6), H - 1.6, H + 0.3));
@@ -137,16 +141,20 @@ function siteCranes(ctx, B) {
     const p = (k.parts = {});
     p.plat = mbox(t, STEEL);
     p.cab = g(); p.cabBox = mbox(p.cab, STEEL); p.glass = path("t1", p.cab); p.glint = path("nf lo", p.cab);
+    p.glass.setAttribute("data-paint", "glass");
     p.cat = g(); p.catFar = path("nf lo", p.cat); p.catNear = path("nf", p.cat); p.catLegs = path("nf sil", p.cat);
     p.cap = mbox(p.cat, STEEL, true); p.lamp = path("t6 sil", p.cat);
+    p.lamp.setAttribute("data-paint", "lamp");
     p.jib = g(); p.jFar = path("nf lo", p.jib);
     p.rope = path("nf lo", p.jib); p.trol = mbox(p.jib, STEEL, true); p.wheels = path("t3", p.jib);
+    p.rope.setAttribute("data-paint", "steel");
     p.jNearL = path("nf", p.jib); p.jChords = path("nf sil", p.jib);
     p.cj = g(); p.deck = mbox(p.cj, STEEL); p.railFar = path("nf lo", p.cj);
     p.drum = g(); p.drumBody = path("t4 sil", p.drum); p.drumEnd = path("sil", p.drum);
     p.cabinet = mbox(null, STEEL, true); p.cj.appendChild(p.drum); p.cj.appendChild(p.cabinet.g);
     p.railNear = path("nf", p.cj);
     p.cw = g(); p.cwBox = mbox(p.cw, WEIGHT); p.seams = path("nf lo", p.cw);
+    p.cw.setAttribute("data-paint", "concrete");
     p.ties = path("nf", t);
     // the aviation light on the cathead's peak sits on the axis, so it never moves
     const lamp = [];

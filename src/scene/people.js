@@ -109,7 +109,8 @@ function sitePeople(ctx, B, CR) {
   const NONE = {};
 
   function makePerson(x, y, f, o = {}) {
-    const g = mk("g", {}, layer), legs = mk("g", {}, g);
+    // workwear for the crew, a jacket and dark trousers for the manager; limbs take their tone from the light, so each paint is one cloth
+    const g = mk("g", { "data-paint": o.boss ? "jacket" : "workwear" }, layer), legs = mk("g", o.boss ? { "data-paint": "trousers" } : {}, g);
     const p = {
       x, y, f, px: x, py: y, pf: f, vx: 0, vy: 0, walk: 0, ph: 0, cv: 0, speed: o.speed || 20, boss: !!o.boss,
       lean: 0, crouch: 0, twist: 0, tilt: 0, sway: 0, hy: 0, hp: 0, nod: 0, look: null, want: NONE,
@@ -118,13 +119,13 @@ function sitePeople(ctx, B, CR) {
     p.shadow = makeShadow();
     p.legsG = legs;
     p.leg = [0, 1].map(() => mk("path", { class: "sil t2" }, legs));
-    p.boot = [0, 1].map(() => mk("path", { class: "sil t1" }, legs));
+    p.boot = [0, 1].map(() => mk("path", { class: "sil t1", "data-paint": "rubber" }, legs));
     p.back = mk("g", {}, g);
     p.arm = [0, 1].map(() => mk("path", { class: "sil t3" }, p.back));
     p.torso = mk("path", { class: "sil " + (o.boss ? "t4" : "hv") }, g);
-    p.marks = mk("path", { class: o.boss ? "fo t2" : "lo t4" }, g);
-    p.head = mk("path", { class: "sil t5" }, g);
-    p.hat = mk("path", { class: (o.boss ? "hi" : "sil") + " hv" }, g);
+    p.marks = mk("path", o.boss ? { class: "fo t2" } : { class: "lo t4", "data-paint": "steel" }, g);
+    p.head = mk("path", { class: "sil t5", "data-paint": "skin" }, g);
+    p.hat = mk("path", { class: (o.boss ? "hi" : "sil") + " hv hat" }, g);
     p.front = mk("g", {}, g);
     const Wd = frame(x, y, f);
     p.feet = [1, -1].map((s) => { const q = Wd(0, s * HIPW, 0); return { s, x: q[0], y: q[1], f, z: 0, sw: false, fx: 0, fy: 0, ff: 0, pitch: 0 }; });
@@ -440,17 +441,18 @@ function sitePeople(ctx, B, CR) {
   const TRAY = { bot: rrect(-4.2, -2.4, 3.2, 2.4, 1.3, 2), top: rrect(-6.6, -4.6, 6.6, 4.6, 2.2, 2), heap: rrect(-3.8, -2.3, 3.6, 2.3, 2.1, 2) };
   const WHEEL16 = Array.from({ length: 16 }, (_, i) => [Math.cos((i / 16) * TPI), Math.sin((i / 16) * TPI)]);
   function makeBarrow() {
-    const g = mk("g", {}, layer);
+    const g = mk("g", { "data-paint": "barrow" }, layer);
     const b = { x: 0, y: 0, f: 0, fill: 0, heap: 0, roll: 0, pitch: 0, lift: 1, tip: 0, it: item(g) };
     b.shadow = makeShadow();
-    b.wheelA = [mk("path", { class: "sil t1" }, g), mk("path", { class: "sil t4" }, g)];
+    const tyre = (cls) => mk("path", { class: cls, "data-paint": "rubber" }, g);
+    b.wheelA = [tyre("sil t1"), tyre("sil t4")];
     b.frame = mk("path", { class: "nf sil" }, g);
     b.base = mk("path", { class: "fo t2" }, g);
     b.side = mk("path", { class: "fo t4" }, g);
     b.hole = mk("path", { class: "fo t1" }, g);
-    b.load = mk("path", { class: "sil t4" }, g);
+    b.load = mk("path", { class: "sil t4", "data-paint": "sand" }, g);
     b.line = mk("path", { class: "nf sil" }, g);
-    b.wheelB = [mk("path", { class: "sil t1" }, g), mk("path", { class: "sil t4" }, g)];
+    b.wheelB = [tyre("sil t1"), tyre("sil t4")];
     return b;
   }
   /** The barrow's own frame: u forward to the wheel, pitched about the axle so the legs lift when pushed. */
@@ -509,7 +511,7 @@ function sitePeople(ctx, B, CR) {
   // the manager: clipboard in one hand, the other points at whatever is being set down
   const boss = makePerson(BOSS[0], BOSS[1], rad(-100), { boss: true, seed: 1 });
   boss.pw = 0; boss.target = [66, 6, 40]; boss.home = rad(-100); boss.placed = story.placed; boss.nodT = 9; boss.glance = 0;
-  boss.clip = mk("path", { class: "sil t6" }, boss.front);
+  boss.clip = mk("path", { class: "sil t6", "data-paint": "wood" }, boss.front);
   boss.props = [{ el: boss.clip, front: true }];
   boss.hands = (s, J, sh) => {
     const { T, fw, lf } = J;
@@ -601,8 +603,8 @@ function sitePeople(ctx, B, CR) {
   shovel.cyc = 0;
   shovel.toolG = mk("g", {}, shovel.front);
   shovel.tool = mk("path", { class: "nf sil" }, shovel.toolG);
-  shovel.blade = mk("path", { class: "sil t3" }, shovel.toolG);
-  shovel.sand = mk("path", { class: "sil t4" }, shovel.toolG);
+  shovel.blade = mk("path", { class: "sil t3", "data-paint": "steel" }, shovel.toolG);
+  shovel.sand = mk("path", { class: "sil t4", "data-paint": "sand" }, shovel.toolG);
   shovel.props = [{ el: shovel.toolG, front: true }];
   /** Shovel poses in the body's frame: G the grip end, X the blade's tip; how far he crouches and leans. */
   const SHOVEL = {
@@ -649,6 +651,7 @@ function sitePeople(ctx, B, CR) {
   const carrier = makePerson(PICK[0], PICK[1], rad(-15), { speed: 16, seed: 9 });
   carrier.bag = false;
   carrier.sack = shadedBox(carrier.front, ["t2", "t3", "t5"]);
+  carrier.sack.g.setAttribute("data-paint", "paper");
   carrier.props = [{ el: carrier.sack.g, front: true }];
   carrier.route = [
     { to: PICK }, { face: toward({ x: PICK[0], y: PICK[1] }, PALLET) },

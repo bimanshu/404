@@ -10,17 +10,19 @@
     --line-edge: oklch(0.63 0.012 260);   /* silhouettes of everything else */
     --line-mid: oklch(0.79 0.008 260);    /* inner strokes */
     --line-lo: oklch(0.9 0.005 260);      /* what recedes */
-    --block-face: oklch(0.87 0.006 260);  /* the blocks' sides */
-    --block-top: oklch(0.94 0.004 260);   /* the blocks' tops, lit from above */
-    --block-shade: oklch(0.8 0.007 260);  /* the blocks' sides that face away from the light */
-    --loose-face: oklch(0.78 0.008 260);  /* a block a press would knock out */
-    --loose-top: oklch(0.86 0.006 260);
-    --loose-shade: oklch(0.72 0.009 260);
+    /* the 404's blocks are the one strong colour on the page: cobalt */
+    --block-face: oklch(0.6 0.17 263);    /* the blocks' sides */
+    --block-top: oklch(0.75 0.12 258);    /* the blocks' tops, lit from above */
+    --block-shade: oklch(0.5 0.17 265);   /* the blocks' sides that face away from the light */
+    --loose-face: oklch(0.5 0.2 270);     /* a block a press would knock out: deeper */
+    --loose-top: oklch(0.64 0.18 266);
+    --loose-shade: oklch(0.42 0.19 272);
     /* surface tones for shading, from in shade (1) to lit (6); the scene picks them by a face's normal */
     --tone-1: oklch(0.76 0.008 260); --tone-2: oklch(0.82 0.007 260); --tone-3: oklch(0.87 0.006 260);
     --tone-4: oklch(0.91 0.005 260); --tone-5: oklch(0.945 0.004 260); --tone-6: oklch(0.975 0.003 255);
-    --hivis: oklch(0.97 0.004 255);       /* reflective vests and hard hats: the brightest cloth */
-    --shadow: oklch(0.45 0.01 260);       /* contact shadows, faded by the scene */
+    --hivis: oklch(0.72 0.19 48);         /* reflective vests: fluorescent orange */
+    --hat: oklch(0.87 0.17 93);           /* hard hats: safety yellow */
+    --shadow: oklch(0.4 0.06 268);        /* contact shadows, faded by the scene: a cool blue */
   }
   @media (prefers-color-scheme: dark) {
     :root:not([data-theme="light"]) {
@@ -31,7 +33,11 @@
       --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
       --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
       --tone-4: oklch(0.27 0.007 260); --tone-5: oklch(0.32 0.008 260); --tone-6: oklch(0.38 0.009 260);
-      --hivis: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
+      --hivis: oklch(0.66 0.01 255); --hat: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
+    }
+    :root:not([data-theme="light"]) .stage [data-paint] {
+      --tone-1: inherit; --tone-2: inherit; --tone-3: inherit; --tone-4: inherit; --tone-5: inherit; --tone-6: inherit;
+      --hivis: inherit; --hat: inherit; --hl-plate: inherit; --hl-edge: inherit; --hl-mid: inherit; --hl-lo: inherit;
     }
   }
   :root[data-theme="dark"] {
@@ -42,7 +48,12 @@
     --loose-face: oklch(0.43 0.01 260); --loose-top: oklch(0.52 0.01 260); --loose-shade: oklch(0.36 0.01 260);
     --tone-1: oklch(0.17 0.004 260); --tone-2: oklch(0.2 0.005 260); --tone-3: oklch(0.235 0.006 260);
     --tone-4: oklch(0.27 0.007 260); --tone-5: oklch(0.32 0.008 260); --tone-6: oklch(0.38 0.009 260);
-    --hivis: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
+    --hivis: oklch(0.66 0.01 255); --hat: oklch(0.66 0.01 255); --shadow: oklch(0.06 0.004 260);
+  }
+  /* the dark theme keeps its greys: every paint below hands its tones back to the page */
+  :root[data-theme="dark"] .stage [data-paint] {
+    --tone-1: inherit; --tone-2: inherit; --tone-3: inherit; --tone-4: inherit; --tone-5: inherit; --tone-6: inherit;
+    --hivis: inherit; --hat: inherit; --hl-plate: inherit; --hl-edge: inherit; --hl-mid: inherit; --hl-lo: inherit;
   }
 
   * { box-sizing: border-box; }
@@ -79,7 +90,107 @@
   .stage .t1 { fill: var(--tone-1); } .stage .t2 { fill: var(--tone-2); } .stage .t3 { fill: var(--tone-3); }
   .stage .t4 { fill: var(--tone-4); } .stage .t5 { fill: var(--tone-5); } .stage .t6 { fill: var(--tone-6); }
   .stage .hv { fill: var(--hivis); }
+  .stage .hat { fill: var(--hat); }
   .stage .shade-stop { stop-color: var(--shadow); }
+
+  /* Paint, for the light theme. A group marked data-paint="…" swaps the six grey tones for its own ramp, t1 in shade
+     to t6 lit, so every kind of thing on the site reads in its own colour while the light still models it. Strokes
+     stay grey unless a paint says otherwise: the cranes and the rebar are mostly line, so their lines take the colour.
+     The dark theme hands all of it back to the page's greys (above). */
+  .stage [data-paint] { --hl-edge: var(--line-edge); --hl-mid: var(--line-mid); --hl-lo: var(--line-lo); }
+  /* safety yellow: the cranes, their hook blocks, the formwork panels, the compressor */
+  .stage :is([data-paint="crane"], [data-paint="hook"], [data-paint="formwork"], [data-paint="compressor"]) {
+    --tone-1: oklch(0.66 0.13 72); --tone-2: oklch(0.74 0.15 80); --tone-3: oklch(0.81 0.16 87);
+    --tone-4: oklch(0.86 0.16 92); --tone-5: oklch(0.9 0.14 96); --tone-6: oklch(0.95 0.09 100);
+  }
+  .stage [data-paint="crane"] { --hl-edge: oklch(0.6 0.12 68); --hl-mid: oklch(0.72 0.14 78); --hl-lo: oklch(0.84 0.11 88); }
+  /* cobalt: the 404's own pores, grit and cracks, and the broken block in the skip */
+  .stage [data-paint="block"] {
+    --tone-1: oklch(0.42 0.15 266); --tone-2: oklch(0.5 0.17 265); --tone-3: oklch(0.6 0.17 263);
+    --tone-4: oklch(0.68 0.15 260); --tone-5: oklch(0.82 0.09 256); --tone-6: oklch(0.88 0.06 255);
+    --hl-edge: oklch(0.42 0.14 266); --hl-mid: oklch(0.55 0.15 264); --hl-lo: oklch(0.68 0.12 260);
+  }
+  /* traffic orange: the cones (their collars stay reflective white) and the mixer */
+  .stage :is([data-paint="cone"], [data-paint="mixer"]) {
+    --tone-1: oklch(0.58 0.17 40); --tone-2: oklch(0.64 0.19 43); --tone-3: oklch(0.69 0.19 46);
+    --tone-4: oklch(0.74 0.18 50); --tone-5: oklch(0.79 0.16 55); --tone-6: oklch(0.85 0.12 60);
+    --hivis: oklch(0.98 0.004 255);
+  }
+  /* terracotta: the stock of blocks on their pallets */
+  .stage [data-paint="stock"] {
+    --tone-1: oklch(0.52 0.11 36); --tone-2: oklch(0.6 0.13 38); --tone-3: oklch(0.67 0.13 40);
+    --tone-4: oklch(0.74 0.11 44); --tone-5: oklch(0.8 0.09 48); --tone-6: oklch(0.87 0.06 52);
+  }
+  /* timber: pallets, bearers, planks, scaffold boards */
+  .stage [data-paint="wood"] {
+    --tone-1: oklch(0.58 0.07 60); --tone-2: oklch(0.66 0.08 64); --tone-3: oklch(0.73 0.085 68);
+    --tone-4: oklch(0.79 0.08 72); --tone-5: oklch(0.85 0.065 76); --tone-6: oklch(0.9 0.05 80);
+  }
+  .stage [data-paint="sand"] {
+    --tone-1: oklch(0.72 0.08 72); --tone-2: oklch(0.78 0.09 78); --tone-3: oklch(0.83 0.09 82);
+    --tone-4: oklch(0.87 0.085 85); --tone-5: oklch(0.91 0.07 88); --tone-6: oklch(0.95 0.045 90);
+  }
+  /* kraft paper: the cement sacks */
+  .stage [data-paint="paper"] {
+    --tone-1: oklch(0.62 0.06 62); --tone-2: oklch(0.7 0.065 66); --tone-3: oklch(0.77 0.065 70);
+    --tone-4: oklch(0.82 0.06 73); --tone-5: oklch(0.87 0.05 76); --tone-6: oklch(0.92 0.035 80);
+  }
+  /* rust: rebar, mesh and the column cage, drawn mostly in line */
+  .stage [data-paint="rust"] {
+    --tone-1: oklch(0.46 0.08 40); --tone-2: oklch(0.53 0.09 42); --tone-3: oklch(0.6 0.09 45);
+    --tone-4: oklch(0.67 0.085 48); --tone-5: oklch(0.74 0.07 52); --tone-6: oklch(0.82 0.05 56);
+    --hl-edge: oklch(0.5 0.08 42); --hl-mid: oklch(0.62 0.08 46); --hl-lo: oklch(0.76 0.06 50);
+  }
+  /* green: the skip and the barrow's tray */
+  .stage :is([data-paint="skip"], [data-paint="barrow"]) {
+    --tone-1: oklch(0.5 0.1 152); --tone-2: oklch(0.57 0.12 152); --tone-3: oklch(0.64 0.12 150);
+    --tone-4: oklch(0.71 0.11 148); --tone-5: oklch(0.78 0.09 146); --tone-6: oklch(0.86 0.06 145);
+  }
+  /* signal red: the oil drums */
+  .stage [data-paint="drum"] {
+    --tone-1: oklch(0.5 0.16 27); --tone-2: oklch(0.56 0.18 27); --tone-3: oklch(0.62 0.19 28);
+    --tone-4: oklch(0.68 0.17 30); --tone-5: oklch(0.74 0.15 32); --tone-6: oklch(0.82 0.1 36);
+  }
+  /* the hoarding: a soft mint, light enough to stay behind the 404 */
+  .stage [data-paint="hoarding"] {
+    --tone-1: oklch(0.76 0.06 178); --tone-2: oklch(0.81 0.06 178); --tone-3: oklch(0.85 0.055 178);
+    --tone-4: oklch(0.89 0.05 178); --tone-5: oklch(0.92 0.04 178); --tone-6: oklch(0.95 0.03 178);
+  }
+  /* the site board on the hoarding: white, with a cobalt header */
+  .stage [data-paint="board"] { --tone-1: oklch(0.55 0.17 263); --tone-4: oklch(0.975 0.003 255); }
+  /* concrete: the slab, the yard pad, footings, ballast, counterweights, rubble; a little warm */
+  .stage :is([data-paint="concrete"], [data-paint="slab"]) {
+    --tone-1: oklch(0.74 0.012 75); --tone-2: oklch(0.8 0.012 78); --tone-3: oklch(0.86 0.01 80);
+    --tone-4: oklch(0.9 0.009 82); --tone-5: oklch(0.94 0.007 85); --tone-6: oklch(0.97 0.005 85);
+  }
+  .stage [data-paint="slab"] { --hl-plate: oklch(0.955 0.011 85); }
+  /* steel: the page's own greys, for a part inside something painted */
+  .stage [data-paint="steel"] {
+    --tone-1: oklch(0.76 0.008 260); --tone-2: oklch(0.82 0.007 260); --tone-3: oklch(0.87 0.006 260);
+    --tone-4: oklch(0.91 0.005 260); --tone-5: oklch(0.945 0.004 260); --tone-6: oklch(0.975 0.003 255);
+  }
+  .stage [data-paint="rubber"] {
+    --tone-1: oklch(0.36 0.01 260); --tone-2: oklch(0.42 0.01 260); --tone-3: oklch(0.5 0.01 260);
+    --tone-4: oklch(0.62 0.01 260); --tone-5: oklch(0.72 0.008 260); --tone-6: oklch(0.8 0.006 260);
+  }
+  .stage [data-paint="glass"] { --tone-1: oklch(0.52 0.07 230); }
+  .stage [data-paint="lamp"] { --tone-6: oklch(0.64 0.22 28); }
+  /* the crew in navy workwear (arms and legs take their tone from the light, so it is one cloth); vests and hats come from --hivis and --hat */
+  .stage [data-paint="workwear"] {
+    --tone-1: oklch(0.36 0.07 262); --tone-2: oklch(0.42 0.08 260); --tone-3: oklch(0.48 0.09 258);
+    --tone-4: oklch(0.54 0.09 256); --tone-5: oklch(0.6 0.085 254); --tone-6: oklch(0.66 0.08 252);
+  }
+  /* the manager: a pale blue jacket, charcoal trousers and a white hat */
+  .stage [data-paint="jacket"] {
+    --tone-1: oklch(0.6 0.06 240); --tone-2: oklch(0.68 0.06 238); --tone-3: oklch(0.75 0.055 236);
+    --tone-4: oklch(0.82 0.05 235); --tone-5: oklch(0.87 0.04 234); --tone-6: oklch(0.92 0.03 232);
+    --hat: oklch(0.985 0.003 90);
+  }
+  .stage [data-paint="trousers"] {
+    --tone-1: oklch(0.32 0.02 260); --tone-2: oklch(0.37 0.02 260); --tone-3: oklch(0.42 0.025 260);
+    --tone-4: oklch(0.47 0.025 260); --tone-5: oklch(0.52 0.025 260); --tone-6: oklch(0.57 0.025 260);
+  }
+  .stage [data-paint="skin"] { --tone-5: oklch(0.8 0.06 55); }
 
   /* the one control: sound, in the top corner, clear of the site */
   .sound {

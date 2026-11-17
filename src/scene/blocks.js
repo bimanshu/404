@@ -177,7 +177,7 @@ function siteBlocks(ctx) {
 
   const blocks = slots.map((s) => {
     // the solid moves as one (a translate), and its paths are worked out again only when it turns; its dust stays put beside it
-    const g = mk("g", {}, layer), body = mk("g", {}, g), el = { g, body, fx: mk("g", {}, g) };
+    const g = mk("g", {}, layer), body = mk("g", { "data-paint": "block" }, g), el = { g, body, fx: mk("g", {}, g) };
     el.base = mk("path", { class: "fo blk-shade" }, body);
     el.mid = mk("path", { class: "fo blk" }, body);
     el.top = mk("path", { class: "fo blk-top" }, body);

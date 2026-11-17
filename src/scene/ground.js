@@ -20,7 +20,10 @@ function siteGround(ctx) {
    * depth sort: for what nothing that moves ever passes in front of or behind.
    */
   let flat = null;
-  const group = (key) => { const g = mk("g", {}, flat ? flat.props : layer); if (!flat) item(g, key); return g; };
+  /** paint names the colour the page gives this kind of thing (data-paint); the light theme reads it, the dark one keeps its greys. */
+  const group = (key, paint) => { const g = mk("g", paint ? { "data-paint": paint } : {}, flat ? flat.props : layer); if (!flat) item(g, key); return g; };
+  /** A group inside g, painted as something else: a pallet under blocks, a cone's rubber base. */
+  const sub = (g, paint) => mk("g", { "data-paint": paint }, g);
   const dot = (a, b) => a[0] * b[0] + a[1] * b[1] + a[2] * b[2];
   const cross = (a, b) => [a[1] * b[2] - a[2] * b[1], a[2] * b[0] - a[0] * b[2], a[0] * b[1] - a[1] * b[0]];
   /** Local to screen on a frame turned by th about (x, y): u along th, v to its left, z up. */
@@ -109,8 +112,8 @@ function siteGround(ctx) {
     for (const [sx, sy, rx, ry, deg, k] of [[92, y1 + 1.5, 236, 9, 0, 0.42], [x1 - 1, 48, 96, 4.6, 90, 0.36], [x1 - 21, y1 - 17, 34, 6.5, -45, 0.32], [x0 + 24, y1 - 13, 34, 8, 45, 0.24]]) {
       shadow(sx + 3, sy, rx, ry, rad(deg), k, -7, ground);
     }
-    const f = boxFaces(outer, -6, 0, inner);
-    path(ground, "fo t2", f.right); path(ground, "fo t3", f.left); path(ground, "fo", f.top); path(ground, "nf sil", f.sil); path(ground, "nf lo", f.crease);
+    const f = boxFaces(outer, -6, 0, inner), slab = sub(ground, "slab");
+    path(slab, "fo t2", f.right); path(slab, "fo t3", f.left); path(slab, "fo", f.top); path(slab, "nf sil", f.sil); path(slab, "nf lo", f.crease);
 
     // saw-cut joints: across the slab between the digits, and along it behind the landing area and the barrow lane
     let d = "";
@@ -135,12 +138,13 @@ function siteGround(ctx) {
     for (let i = 0; i <= 10; i++) { const x = 236 + i * 2.8; m += open([P(x, 107, 0.4), P(x, 129, 0.4)]); }
     for (let j = 0; j <= 7; j++) { const y = 108 + (j * 20) / 7; m += open([P(235, y, 0.4), P(265, y, 0.4)]); }
     for (const [x, y] of [[240.2, 111], [259.8, 111], [240.2, 125], [259.8, 125]]) m += open([P(x - 0.7, y, 0), P(x, y, 0.4), P(x + 0.7, y, 0)]);
-    path(ground, "nf", m);
+    path(sub(ground, "rust"), "nf", m);
 
     // the stock yard's raised pad
     const pr = rrect(PAD.x0, PAD.y0, PAD.x1, PAD.y1, 4, 4);
     const pf = boxFaces(pr, 0, PAD.h, rrect(PAD.x0 + 0.9, PAD.y0 + 0.9, PAD.x1 - 0.9, PAD.y1 - 0.9, 3.1, 4));
-    path(ground, "fo t2", pf.sil); path(ground, "fo t3", pf.left); path(ground, "fo t5", pf.top); path(ground, "nf sil", pf.sil); path(ground, "nf lo", pf.crease);
+    const pad = sub(ground, "concrete");
+    path(pad, "fo t2", pf.sil); path(pad, "fo t3", pf.left); path(pad, "fo t5", pf.top); path(pad, "nf sil", pf.sil); path(pad, "nf lo", pf.crease);
   }
 
   // ---------------------------------------------------------------- the hoarding
@@ -172,13 +176,13 @@ function siteGround(ctx) {
     }
     for (const t in faces) path(g, "fo " + t, faces[t]);
     path(g, "fo t6", top.join("")); path(g, "nf", ln.join("")); path(g, "nf sil", sil.join(""));
-    boxes(g, feet, STONE);
+    boxes(sub(g, "concrete"), feet, STONE);
   }
   /** A gate post with its cap. */
   const post = (g, x, y) => { box(g, x, y, 0, -1.3, -1.3, 1.3, 1.3, 0, 26, WHITE, 0.3); box(g, x, y, 0, -1.7, -1.7, 1.7, 1.7, 26, 26.9, STONE, 0.3); };
   /** Round the back, from the left gate to the right side: it stands behind everything inside. */
   function backHoarding() {
-    const g = group(-1e4);
+    const g = group(-1e4, "hoarding");
     shadow(-117.5, 45, 56, 4.5, rad(90), 0.3);
     shadow(88, -40.5, 180, 3, 0, 0.2);
     hoarding(g, [[-122, 100], [-122, -10], [-117.6, -26.5], [-105.5, -38.6], [-89, -43], [264, -43], [280.5, -38.6], [292.6, -26.5], [297, -10]]);
@@ -186,12 +190,12 @@ function siteGround(ctx) {
   }
   /** The right side, seen from outside, in two halves so what stands near it inside paints first; the site board on the far half, the gate post on the near one. */
   function sideHoarding(near) {
-    const g = group(depth(297, near ? 42.5 : 7.5) + 6);
+    const g = group(depth(297, near ? 42.5 : 7.5) + 6, "hoarding");
     hoarding(g, near ? [[297, 25], [297, 60]] : [[297, -10], [297, 25]]);
     if (near) return post(g, 297, 60);
-    const S = (y, z) => P(297.8, y, z), board = poly([S(22, 6), S(4, 6), S(4, 17), S(22, 17)]);
-    path(g, "fo t4", board);
-    path(g, "fo t1", poly([S(22, 14.4), S(4, 14.4), S(4, 17), S(22, 17)]) + poly([S(8.6, 7.4), S(5.4, 7.4), S(5.4, 10.6), S(8.6, 10.6)]));
+    const S = (y, z) => P(297.8, y, z), board = poly([S(22, 6), S(4, 6), S(4, 17), S(22, 17)]), sign = sub(g, "board");
+    path(sign, "fo t4", board);
+    path(sign, "fo t1", poly([S(22, 14.4), S(4, 14.4), S(4, 17), S(22, 17)]) + poly([S(8.6, 7.4), S(5.4, 7.4), S(5.4, 10.6), S(8.6, 10.6)]));
     path(g, "nf", [[12.6, 15], [11.2, 12], [9.4, 13]].map(([w, z], i) => open([S(20.6, z - i * 1.5 - 0.5), S(20.6 - w, z - i * 1.5 - 0.5)])).join("") + open([S(20.6, 7.6), S(13, 7.6)]));
     path(g, "nf sil", board);
   }
@@ -201,7 +205,7 @@ function siteGround(ctx) {
   function pallet(g, x, y, th, z0, U, V, tones = TIMBER) {
     const W = onto(x, y, th), [eu, ev] = seen(th, -U, -V, U, V), lo = z0 + 0.45, hi = z0 + 1.55;
     // it is low and mostly under its load: one filled outline in its side tone
-    path(g, "sil " + tones[0], boxFaces(rring(x, y, th, -U, -V, U, V, 0.2, 2), z0, z0 + 2).sil);
+    path(sub(g, tones === STEEL ? "steel" : "wood"), "sil " + tones[0], boxFaces(rring(x, y, th, -U, -V, U, V, 0.2, 2), z0, z0 + 2).sil);
     let gap = "", ln = "";
     if (ev !== null) {
       for (const [a, b] of [[-U + 2, -1], [1, U - 2]]) gap += quad(W, [a, ev, lo], [b, ev, lo], [b, ev, hi], [a, ev, hi]);
@@ -231,7 +235,7 @@ function siteGround(ctx) {
    * used leaves the top course on the back half only, its straps cut and one end hanging.
    */
   function blockPallet(x, y, deg, z0, o = {}) {
-    const g = group(depth(x, y)), U = 7.5, V = 6, u = U - 0.4, v = V - 0.4;
+    const g = group(depth(x, y), "stock"), U = 7.5, V = 6, u = U - 0.4, v = V - 0.4;
     under(x, y, rad(deg), 15, 12, z0);
     for (let L = 0; L < (o.two ? 2 : 1); L++) {
       const X = x + L * 0.5, Y = y + L * 0.3, th = rad(deg + L * 2), Z = z0 + L * (2 + 3 * CH), W = onto(X, Y, th);
@@ -266,7 +270,7 @@ function siteGround(ctx) {
   }
   /** Loose blocks: [u, v, yaw, z] in the item's frame, each L by D by H with its cores on top; drawn far to near. */
   function looseBlocks(x, y, deg, z0, list, L, D, H = 3.2) {
-    const g = group(depth(x, y)), th = rad(deg), c = Math.cos(th), s = Math.sin(th);
+    const g = group(depth(x, y), "stock"), th = rad(deg), c = Math.cos(th), s = Math.sin(th);
     under(x, y, th, 11, 7, z0, 0.38);
     const at = list.map(([u, v, yaw, z]) => ({ x: x + u * c - v * s, y: y + u * s + v * c, th: th + rad(yaw), z: z0 + z }));
     at.sort((a, b) => a.z - b.z || depth(a.x, a.y) - depth(b.x, b.y));
@@ -276,10 +280,10 @@ function siteGround(ctx) {
     }
   }
   /** Bearers under a load: small timber boxes across it at the given u. */
-  const bearers = (g, x, y, th, us, half, z0, h) => boxes(g, us.map((u) => [x, y, th, u - 0.8, -half, u + 0.8, half, z0, z0 + h]), TIMBER);
+  const bearers = (g, x, y, th, us, half, z0, h) => boxes(sub(g, "wood"), us.map((u) => [x, y, th, u - 0.8, -half, u + 0.8, half, z0, z0 + h]), TIMBER);
   /** A bundle of planks on three bearers: the plank ends a staggered grid on the end we see, layer lines along the side, two steel straps. */
   function timber(x, y, deg, z0, L, D, H, layers = 3, planks = 4) {
-    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), [eu, ev] = seen(th, -L / 2, -D / 2, L / 2, D / 2), b = z0 + 1.5, top = b + H;
+    const g = group(depth(x, y), "wood"), th = rad(deg), W = onto(x, y, th), [eu, ev] = seen(th, -L / 2, -D / 2, L / 2, D / 2), b = z0 + 1.5, top = b + H;
     under(x, y, th, L, D, z0);
     bearers(g, x, y, th, [-L / 2 + 3, 0, L / 2 - 3], D / 2 + 0.7, z0, 1.5);
     box(g, x, y, th, -L / 2, -D / 2, L / 2, D / 2, b, top, TIMBER, 0.2);
@@ -299,7 +303,7 @@ function siteGround(ctx) {
   }
   /** Bundles of bar on timber bearers: bars along the top and side, their ends as small rings on the end we see, a few standing proud, wire ties. */
   function rebar(x, y, deg, L, D, H, n = 1, nb = 3) {
-    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), b = 1.5, top = b + H, span = n * D + (n - 1);
+    const g = group(depth(x, y), "rust"), th = rad(deg), W = onto(x, y, th), b = 1.5, top = b + H, span = n * D + (n - 1);
     const [eu, ev] = seen(th, -L / 2, -span / 2, L / 2, span / 2);
     under(x, y, th, L, span);
     bearers(g, x, y, th, nb === 3 ? [-L / 2 + 3, 0, L / 2 - 3] : [-L / 2 + 4, L / 2 - 4], span / 2 + 0.8, 0, b);
@@ -326,7 +330,7 @@ function siteGround(ctx) {
   }
   /** Three planks: two lying side by side and a third across them, just pulled from the bundle. */
   function planks(x, y, deg) {
-    const g = group(depth(x, y)), th = rad(deg), c = Math.cos(th), s = Math.sin(th);
+    const g = group(depth(x, y), "wood"), th = rad(deg), c = Math.cos(th), s = Math.sin(th);
     under(x, y, th, 22, 7, 0, 0.32);
     for (const v of [-1.7, 1.7]) box(g, x - v * s, y + v * c, th, -11, -1.1, 11, 1.1, 0, 0.8, TIMBER, 0.1);
     box(g, x + 1.5 * c, y + 1.5 * s, th + rad(20), -11, -1.1, 11, 1.1, 0.8, 1.6, TIMBER, 0.1);
@@ -335,7 +339,7 @@ function siteGround(ctx) {
   // ---------------------------------------------------------------- the back strip and its corners
   /** A scaffold bay: two lifts with board decks, end frames, ledgers, cross braces on the far face, guard rails and a toe board. */
   function scaffoldBay(x, y, deg) {
-    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), U = 7, V = 4, L1 = 14, L2 = 28, R1 = 31, R2 = 34;
+    const g = group(depth(x, y), "wood"), th = rad(deg), W = onto(x, y, th), U = 7, V = 4, L1 = 14, L2 = 28, R1 = 31, R2 = 34;
     const [eu, ev] = seen(th, -U, -V, U, V), fu = eu === null ? -U : eu, fv = ev === null ? V : ev, bu = -fu, bv = -fv;
     under(x, y, th, 14, 8, 0, 0.4);
     boxes(g, [-U, U].map((u) => [x, y, th, u - 0.8, -V - 1.3, u + 0.8, V + 1.3, 0, 0.6]), TIMBER);
@@ -357,7 +361,7 @@ function siteGround(ctx) {
   }
   /** A steel skip: sloped sides, ribs and lifting lugs, heaped with rubble, a broken block and a plank end. */
   function skip(x, y) {
-    const g = group(depth(x, y)), W = onto(x, y, 0);
+    const g = group(depth(x, y), "skip"), W = onto(x, y, 0);
     under(x, y, 0, 26, 12, 0, 0.46);
     const lug = (s) => { const pts = []; for (let i = 0; i < 12; i++) { const a = (i / 12) * TAU; for (const u of [13.4, 15]) pts.push(W(s * u, Math.cos(a), 8 + Math.sin(a))); } return poly(hull(pts)); };
     path(g, "sil t2", lug(-1));
@@ -371,10 +375,10 @@ function siteGround(ctx) {
     const heap = [];
     for (let i = 0; i < 14; i++) { const a = (i / 14) * TAU; heap.push(W(12.4 * Math.cos(a) * (0.9 + 0.1 * hash(i + 3)), 5.4 * Math.sin(a), 10.7)); }
     for (const [u, v, z] of [[-9, -2, 12.6], [-5, 0.5, 13.8], [-1, -1.5, 14.2], [3, 1, 13.4], [7, -2.5, 13.9], [10.5, -0.5, 12.2], [-11, 1.5, 11.6]]) heap.push(W(u, v, z));
-    path(g, "t3", poly(hull(heap)));
+    path(sub(g, "concrete"), "t3", poly(hull(heap)));
     path(g, "nf", lines(W, [[-8, 1, 12.1], [-6.4, 2.6, 11.6], [-4.4, 2, 12.2]], [[1, 2.4, 12.4], [2.6, 3.8, 11.6], [4.6, 3, 12.1]], [[-3, -2.6, 13.4], [-1.4, -1.4, 13.9]], [[8.2, 1.6, 12.4], [9.8, 2.8, 11.6]]));
-    box(g, x - 4.8, y + 2.2, rad(24), -2.5, -1.5, 2.5, 1.5, 11.2, 14.2, STONE, 0.2);
-    path(g, "sil t4", quad(W, [5.4, -0.6, 12.6], [6.4, 0.4, 12.6], [16.4, -3.6, 17.2], [15.4, -4.6, 17.2]));
+    box(sub(g, "block"), x - 4.8, y + 2.2, rad(24), -2.5, -1.5, 2.5, 1.5, 11.2, 14.2, STONE, 0.2);
+    path(sub(g, "wood"), "sil t4", quad(W, [5.4, -0.6, 12.6], [6.4, 0.4, 12.6], [16.4, -3.6, 17.2], [15.4, -4.6, 17.2]));
     path(g, "nf sil", lines(W, [[-14, 7, 11], [14, 7, 11], [14, -7, 11]], [[-11, 5, 0.5], [11, 5, 0.5], [11, -5, 0.5]]));
     let ribs = lines(W, [[-13.7, 6.85, 10], [13.7, 6.85, 10], [13.7, -6.85, 10]], [[11, 0, 0.5], [14, 0, 11]]);
     for (const f of [-0.5, 0, 0.5]) ribs += lines(W, [[f * 11, 5, 0.5], [f * 14, 7, 11]]);
@@ -397,19 +401,19 @@ function siteGround(ctx) {
   }
   /** A stack of formwork panels on two bearers, with two aluminium soldiers across the top. */
   function formwork(x, y) {
-    const g = group(depth(x, y)), W = onto(x, y, 0);
+    const g = group(depth(x, y), "formwork"), W = onto(x, y, 0);
     under(x, y, 0, 20, 10);
     bearers(g, x, y, 0, [-7, 7], 5.6, 0, 1.5);
     box(g, x, y, 0, -10, -5, 10, 5, 1.5, 6, TIMBER, 0.15);
     let ln = "";
     for (let k = 1; k < 4; k++) { const z = 1.5 + (k * 4.5) / 4; ln += lines(W, [[-10, 5, z], [10, 5, z], [10, -5, z]]); }
     path(g, "nf", ln);
-    boxes(g, [-5, 5].map((u) => [x, y, 0, u - 1, -6, u + 1, 6, 6, 7]), WHITE);
+    boxes(sub(g, "steel"), [-5, 5].map((u) => [x, y, 0, u - 1, -6, u + 1, 6, 6, 7]), WHITE);
     path(g, "nf", lines(W, [[-5, -6, 7], [-5, 6, 7]], [[5, -6, 7], [5, 6, 7]]));
   }
   /** Two oil drums, rolling hoops, lids and bungs. */
   function drums(x, y) {
-    const g = group(depth(x, y));
+    const g = group(depth(x, y), "drum");
     shadow(x + 0.8, y - 0.3, 8.6, 4.8, 0, 0.42);
     for (const u of [-3.1, 3.1]) {
       const cx = x + u, cy = y + (u < 0 ? -0.4 : 0.4), sil = lathe(g, cx, cy, [[3.1, 0], [3.1, 8.5]], 1);
@@ -419,7 +423,7 @@ function siteGround(ctx) {
   }
   /** A stack of mesh sheets: layer lines on the sides, the top sheet's bars, their ends standing proud. */
   function meshStack(x, y) {
-    const g = group(depth(x, y)), W = onto(x, y, 0);
+    const g = group(depth(x, y), "rust"), W = onto(x, y, 0);
     under(x, y, 0, 20, 8, 0, 0.38);
     box(g, x, y, 0, -10, -4, 10, 4, 0, 3, STEEL, 0.1);
     let ln = "";
@@ -450,12 +454,12 @@ function siteGround(ctx) {
   }
   /** A tow-behind compressor: the body with its lid seam, louvres and service door, road wheels and mudguards, the drawbar with its jockey wheel, and the hose lying in coils. */
   function compressor(x, y, deg) {
-    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), side = sees(-Math.sin(th), Math.cos(th)) ? 1 : -1;
+    const g = group(depth(x, y), "compressor"), th = rad(deg), W = onto(x, y, th), side = sees(-Math.sin(th), Math.cos(th)) ? 1 : -1;
     shadow(x + 0.8, y - 0.2, 20, 9, th, 0.44);
     const tyre = (v, cls) => {
       const pts = [];
       for (let i = 0; i < 20; i++) { const a = (i / 20) * TAU; for (const dv of [-0.8, 0.8]) pts.push(W(-4.5 + 3.4 * Math.cos(a), v + dv, 3.4 + 3.4 * Math.sin(a))); }
-      path(g, cls, poly(hull(pts)));
+      path(sub(g, "rubber"), cls, poly(hull(pts)));
     };
     const disk = (u, v, z, r, n = 18) => poly(Array.from({ length: n }, (_, i) => { const a = (i / n) * TAU; return W(u + r * Math.cos(a), v, z + r * Math.sin(a)); }));
     tyre(-side * 6.2, "sil t1");
@@ -490,7 +494,7 @@ function siteGround(ctx) {
   }
   /** A column cage lying on two bearers: four corner bars and the stirrups round them. */
   function cage(x, y, deg) {
-    const g = group(depth(x, y)), th = rad(deg), W = onto(x, y, th), [, ev] = seen(th, -12, -2.5, 12, 2.5), fv = ev === null ? 2.5 : ev, bv = -fv, z0 = 1, z1 = 6;
+    const g = group(depth(x, y), "rust"), th = rad(deg), W = onto(x, y, th), [, ev] = seen(th, -12, -2.5, 12, 2.5), fv = ev === null ? 2.5 : ev, bv = -fv, z0 = 1, z1 = 6;
     under(x, y, th, 24, 6.5, 0, 0.36);
     bearers(g, x, y, th, [-8, 8], 4, 0, 1);
     let far = lines(W, [[-12, bv, z0], [12, bv, z0]]), near = lines(W, [[-12, fv, z0], [12, fv, z0]], [[-12, fv, z1], [12, fv, z1]], [[-12, bv, z1], [12, bv, z1]]);
@@ -501,7 +505,7 @@ function siteGround(ctx) {
   // ---------------------------------------------------------------- the props the crew work at
   /** The sand pile: a slumped cone shaded by its slopes, ripples and runnels, and the bite the shoveler takes from its right side. */
   function sandPile([x, y]) {
-    const g = group(depth(x, y)), n = 36;
+    const g = group(depth(x, y), "sand"), n = 36;
     shadow(x + 1.5, y - 0.6, 20.5, 16.5, 0, 0.4);
     const wob = (a) => 1 + 0.07 * Math.sin(a * 3 + 1) + 0.03 * Math.sin(a * 7 + 2);
     const PROF = [[1, 0, 0], [0.76, 2.6, 0.2], [0.5, 7.6, 0.55], [0.3, 10.8, 0.8], [0.15, 12.4, 0.95]];
@@ -558,7 +562,7 @@ function siteGround(ctx) {
   }
   /** The cement bags on their pallet: three across, two along on top. */
   function bagPallet([x, y]) {
-    const g = group(depth(x, y));
+    const g = group(depth(x, y), "paper");
     under(x, y, 0, 26, 20);
     const [pl, pg] = pallet(g, x, y, 0, 0, 13, 10);
     path(g, "fo t1", pg); path(g, "nf", pl);
@@ -567,9 +571,9 @@ function siteGround(ctx) {
   }
   /** A traffic cone: a rubber base, the cone shaded by its slope, a reflective collar. */
   function cone(x, y) {
-    const g = group(depth(x, y));
+    const g = group(depth(x, y), "cone");
     shadow(x + 0.7, y - 0.2, 5, 5, 0, 0.4);
-    box(g, x, y, 0, -3.4, -3.4, 3.4, 3.4, 0, 0.9, STEEL, 0.9);
+    box(sub(g, "rubber"), x, y, 0, -3.4, -3.4, 3.4, 3.4, 0, 0.9, STEEL, 0.9);
     const sil = lathe(g, x, y, [[2.5, 0.9], [0.55, 9.2]], 2, 20);
     const r = (z) => 2.5 - (1.95 * (z - 0.9)) / 8.3, f = run(circ(1, 20), front);
     const band = (z) => f.map((q) => P(x + r(z) * q.u, y + r(z) * q.v, z));
@@ -580,7 +584,7 @@ function siteGround(ctx) {
   // ---------------------------------------------------------------- the mixer
   /** The site mixer: a drum turning on its cradle, its blades seen through the mouth, the motor housing, chassis, two wheels and the tow bar. */
   function makeMixer([x, y], psi) {
-    const g = group(depth(x, y)), tilt = rad(26);
+    const g = group(depth(x, y), "mixer"), tilt = rad(26);
     const a = [Math.cos(psi) * Math.cos(tilt), Math.sin(psi) * Math.cos(tilt), Math.sin(tilt)];
     const e1 = [-Math.sin(psi), Math.cos(psi), 0], e2 = cross(a, e1);
     const O = [x - a[0] * 5, y - a[1] * 5, 12.5];
@@ -599,7 +603,7 @@ function siteGround(ctx) {
 
     shadow(x + 1, y - 0.4, 17, 10.5, psi, 0.46);
     // behind the drum: the far wheel and arm, the chassis, the motor and the tow bar
-    path(g, "sil t1", wheel(-side * 6.6));
+    path(sub(g, "rubber"), "sil t1", wheel(-side * 6.6));
     path(g, "nf sil", open([W(-2, -side * 3.6, 5.4), trunnion(-side), W(6, -side * 3.6, 5.4)]));
     box(g, x, y, psi, -12, -4, 9, 4, 3.4, 5.6, STEEL, 0.6);
     box(g, x, y, psi, -13, -4.4, -6.5, 4.4, 5.6, 12.5, STONE, 1.2, 0.6);
@@ -623,7 +627,7 @@ function siteGround(ctx) {
     let blades = null;
     if (mouthOpen) {
       path(g, "fo t4", poly(ringP(15, 4.8)));
-      path(g, "fo t1", poly(hole));
+      path(sub(g, "rubber"), "fo t1", poly(hole));
       blades = mk("path", { class: "nf sil" }, g);
       path(g, "nf sil", poly(ringP(15, 4.8)));
       path(g, "nf", poly(hole));
@@ -635,7 +639,7 @@ function siteGround(ctx) {
     let spokes = "";
     for (let k = 0; k < 3; k++) { const b = (k / 3) * TAU + 0.5; spokes += open([P3(hub), P3(v3.add(v3.add(hub, v3.mul(a, 2.4 * Math.cos(b))), [0, 0, 2.4 * Math.sin(b)]))]); }
     path(g, "nf sil", open([W(-2, side * 3.6, 5.4), tn, W(6, side * 3.6, 5.4)]) + open([tn, P3(hub)]) + poly(hw) + spokes);
-    path(g, "sil t1", wheel(side * 6.6));
+    path(sub(g, "rubber"), "sil t1", wheel(side * 6.6));
     path(g, "t4", disk(-3, side * 7.45, 3.6, 2.2));
     path(g, "nf sil", disk(-3, side * 7.5, 3.6, 0.6, 10));
 
